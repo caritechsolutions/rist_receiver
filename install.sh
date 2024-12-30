@@ -92,7 +92,29 @@ stop_services() {
     # Stop main API service
     systemctl stop rist-api
 
+    # Kill any remaining ffmpeg processes
+    echo "Checking for ffmpeg processes..."
+    pkill -9 ffmpeg 2>/dev/null || true
+    pkill -9 ristreceiver 2>/dev/null || true
+
     # Wait a moment for processes to clean up
+    sleep 2
+}
+
+# Kill processes using a directory
+kill_processes_using_directory() {
+    local dir="$1"
+    echo "Finding processes using $dir..."
+    
+    # Find processes using the directory
+    lsof "$dir" | awk '{print $2}' | grep -v PID | while read pid; do
+        if [ ! -z "$pid" ]; then
+            echo "Killing process $pid using $dir"
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+    done
+    
+    # Wait a moment for processes to die
     sleep 2
 }
 
@@ -106,9 +128,18 @@ setup_web() {
     # Unmount content directory if it's mounted
     if mountpoint -q /var/www/html/content; then
         echo "Unmounting content directory..."
-        umount /var/www/html/content || {
+        # Try to find and kill processes using the directory
+        kill_processes_using_directory "/var/www/html/content"
+        
+        # Try normal unmount
+        umount /var/www/html/content 2>/dev/null || {
             echo "Normal unmount failed, trying force unmount..."
-            umount -f /var/www/html/content
+            umount -f /var/www/html/content 2>/dev/null || {
+                echo "Force unmount failed, trying lazy unmount..."
+                umount -l /var/www/html/content 2>/dev/null || {
+                    echo "WARNING: Could not unmount directory. Continuing anyway..."
+                }
+            }
         }
     fi
     
