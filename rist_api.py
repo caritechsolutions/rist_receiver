@@ -9,8 +9,19 @@ from typing import Dict, Optional
 import logging
 import json
 from datetime import datetime
+import time
+from functools import lru_cache
+import traceback
 
-logging.basicConfig(level=logging.INFO)
+# Comprehensive Logging Configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("/var/log/rist-api.log"),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="RIST Receiver API")
@@ -42,6 +53,9 @@ class Channel(BaseModel):
     process_id: Optional[int] = None
     last_error: Optional[str] = None
 
+# Metrics Caching
+metrics_cache = {}
+
 def parse_prometheus_metrics(metrics_text: str) -> dict:
     """Parse Prometheus metrics text into structured data"""
     metrics = {
@@ -69,50 +83,90 @@ def parse_prometheus_metrics(metrics_text: str) -> dict:
     if isinstance(metrics_text, str):
         metrics_text = metrics_text.replace('\\n', '\n').replace('\\"', '"')
     
-    for line in metrics_text.split('\n'):
-        if line.startswith('#') or not line.strip():
-            continue
-            
-        if '{' in line:
-            name, rest = line.split('{', 1)
-            name = name.strip()
-            labels, value_part = rest.rsplit('}', 1)
-            value = float(value_part.strip())
-            
-            if name == 'rist_client_flow_peers':
-                metrics['peers'] = int(value)
-            elif name == 'rist_client_flow_bandwidth_bps':
-                metrics['bandwidth_bps'] = value
-            elif name == 'rist_client_flow_retry_bandwidth_bps':
-                metrics['retry_bandwidth_bps'] = value
-            elif name == 'rist_client_flow_sent_packets_total':
-                metrics['packets']['sent'] = int(value)
-            elif name == 'rist_client_flow_received_packets_total':
-                metrics['packets']['received'] = int(value)
-            elif name == 'rist_client_flow_missing_packets_total':
-                metrics['packets']['missing'] = int(value)
-            elif name == 'rist_client_flow_reordered_packets_total':
-                metrics['packets']['reordered'] = int(value)
-            elif name == 'rist_client_flow_recovered_packets_total':
-                metrics['packets']['recovered'] = int(value)
-            elif name == 'rist_client_flow_recovered_one_retry_packets_total':
-                metrics['packets']['recovered_one_retry'] = int(value)
-            elif name == 'rist_client_flow_lost_packets_total':
-                metrics['packets']['lost'] = int(value)
-            elif name == 'rist_client_flow_min_iat_seconds':
-                metrics['timing']['min_iat'] = value
-            elif name == 'rist_client_flow_cur_iat_seconds':
-                metrics['timing']['cur_iat'] = value
-            elif name == 'rist_client_flow_max_iat_seconds':
-                metrics['timing']['max_iat'] = value
-            elif name == 'rist_client_flow_rtt_seconds':
-                metrics['timing']['rtt'] = value
-            elif name == 'rist_client_flow_quality':
-                metrics['quality'] = value
+    try:
+        for line in metrics_text.split('\n'):
+            if line.startswith('#') or not line.strip():
+                continue
+                
+            if '{' in line:
+                name, rest = line.split('{', 1)
+                name = name.strip()
+                labels, value_part = rest.rsplit('}', 1)
+                value = float(value_part.strip())
+                
+                if name == 'rist_client_flow_peers':
+                    metrics['peers'] = int(value)
+                elif name == 'rist_client_flow_bandwidth_bps':
+                    metrics['bandwidth_bps'] = value
+                elif name == 'rist_client_flow_retry_bandwidth_bps':
+                    metrics['retry_bandwidth_bps'] = value
+                elif name == 'rist_client_flow_sent_packets_total':
+                    metrics['packets']['sent'] = int(value)
+                elif name == 'rist_client_flow_received_packets_total':
+                    metrics['packets']['received'] = int(value)
+                elif name == 'rist_client_flow_missing_packets_total':
+                    metrics['packets']['missing'] = int(value)
+                elif name == 'rist_client_flow_reordered_packets_total':
+                    metrics['packets']['reordered'] = int(value)
+                elif name == 'rist_client_flow_recovered_packets_total':
+                    metrics['packets']['recovered'] = int(value)
+                elif name == 'rist_client_flow_recovered_one_retry_packets_total':
+                    metrics['packets']['recovered_one_retry'] = int(value)
+                elif name == 'rist_client_flow_lost_packets_total':
+                    metrics['packets']['lost'] = int(value)
+                elif name == 'rist_client_flow_min_iat_seconds':
+                    metrics['timing']['min_iat'] = value
+                elif name == 'rist_client_flow_cur_iat_seconds':
+                    metrics['timing']['cur_iat'] = value
+                elif name == 'rist_client_flow_max_iat_seconds':
+                    metrics['timing']['max_iat'] = value
+                elif name == 'rist_client_flow_rtt_seconds':
+                    metrics['timing']['rtt'] = value
+                elif name == 'rist_client_flow_quality':
+                    metrics['quality'] = value
 
+    except Exception as e:
+        logger.error(f"Error parsing metrics: {e}")
+        logger.error(f"Metrics text: {metrics_text}")
+    
     return metrics
 
+def get_cached_metrics(channel_id: str, metrics_port: int, cache_timeout: int = 1):
+    """
+    Retrieve metrics with a simple caching mechanism
+    """
+    current_time = time.time()
+    
+    # Check if we have a cached result and it's fresh
+    if (channel_id in metrics_cache and 
+        current_time - metrics_cache[channel_id]['timestamp'] < cache_timeout):
+        return metrics_cache[channel_id]['data']
+    
+    # Fetch new metrics
+    try:
+        logger.info(f"Fetching metrics for channel {channel_id} from port {metrics_port}")
+        response = requests.get(f"http://localhost:{metrics_port}/metrics", timeout=2)
+        
+        if response.status_code != 200:
+            logger.error(f"Metrics endpoint returned status {response.status_code}")
+            return parse_prometheus_metrics("")
+        
+        metrics = parse_prometheus_metrics(response.text)
+        
+        # Cache the result
+        metrics_cache[channel_id] = {
+            'timestamp': current_time,
+            'data': metrics
+        }
+        
+        return metrics
+    
+    except requests.RequestException as e:
+        logger.error(f"Error fetching metrics for channel {channel_id}: {e}")
+        return parse_prometheus_metrics("")
+
 def reload_systemd():
+    """Reload systemd configuration"""
     try:
         subprocess.run(["systemctl", "daemon-reload"], check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
@@ -120,6 +174,7 @@ def reload_systemd():
         raise HTTPException(status_code=500, detail="Failed to reload systemd")
 
 def generate_service_file(channel_id: str, channel: Dict):
+    """Generate systemd service file for a RIST channel"""
     input_url = channel["input"]
     if channel["settings"].get("virt_src_port"):
         input_url += f"?virt-dst-port={channel['settings']['virt_src_port']}"
@@ -127,6 +182,7 @@ def generate_service_file(channel_id: str, channel: Dict):
     log_port = channel['metrics_port'] + 1000
     stream_path = f"/var/www/html/content/{channel['name']}"
 
+    # Construct command parts for ristreceiver
     cmd_parts = [
         "/usr/local/bin/ristreceiver",
         f"-p {channel['settings']['profile']}",
@@ -140,6 +196,7 @@ def generate_service_file(channel_id: str, channel: Dict):
         f"-r localhost:{log_port}"
     ]
 
+    # Add optional parameters
     if channel["settings"].get("buffer"):
         cmd_parts.append(f"-b {channel['settings']['buffer']}")
     
@@ -149,6 +206,7 @@ def generate_service_file(channel_id: str, channel: Dict):
     if channel["settings"].get("secret"):
         cmd_parts.append(f"-s {channel['settings']['secret']}")
 
+    # Create systemd service content
     service_content = f"""[Unit]
 Description=RIST Channel {channel['name']}
 After=network.target
@@ -185,6 +243,7 @@ WantedBy=multi-user.target
             raise HTTPException(status_code=500, detail="Failed to enable service")
 
 def get_channel_status(channel_id: str) -> str:
+    """Get the status of a channel's systemd service"""
     try:
         result = subprocess.run(
             ["systemctl", "is-active", f"rist-channel-{channel_id}.service"],
@@ -196,6 +255,7 @@ def get_channel_status(channel_id: str) -> str:
         return "error"
 
 def get_next_metrics_port(config):
+    """Find the next available metrics port"""
     max_port = 9200
     for channel in config["channels"].values():
         if channel.get("metrics_port", 0) > max_port:
@@ -203,17 +263,20 @@ def get_next_metrics_port(config):
     return max_port + 1
 
 def load_config():
+    """Load configuration from YAML file"""
     if not os.path.exists(CONFIG_FILE):
         return {"channels": {}}
     with open(CONFIG_FILE, 'r') as f:
         return yaml.safe_load(f)
 
 def save_config(config):
+    """Save configuration to YAML file"""
     with open(CONFIG_FILE, 'w') as f:
         yaml.dump(config, f)
 
 @app.get("/channels")
 def get_channels():
+    """Retrieve all channels with their current status"""
     config = load_config()
     for channel_id in config["channels"]:
         config["channels"][channel_id]["status"] = get_channel_status(channel_id)
@@ -221,6 +284,7 @@ def get_channels():
 
 @app.get("/channels/next")
 def get_next_channel_info():
+    """Get information for the next channel to be created"""
     config = load_config()
     next_metrics_port = get_next_metrics_port(config)
     max_num = 0
@@ -239,6 +303,7 @@ def get_next_channel_info():
 
 @app.get("/channels/{channel_id}")
 def get_channel(channel_id: str):
+    """Retrieve details of a specific channel"""
     config = load_config()
     if channel_id not in config["channels"]:
         raise HTTPException(status_code=404)
@@ -248,6 +313,7 @@ def get_channel(channel_id: str):
 
 @app.post("/channels/{channel_id}")
 def create_channel(channel_id: str, channel: Channel):
+    """Create a new channel"""
     config = load_config()
     if channel_id in config["channels"]:
         raise HTTPException(status_code=400)
@@ -264,6 +330,7 @@ def create_channel(channel_id: str, channel: Channel):
 
 @app.put("/channels/{channel_id}")
 def update_channel(channel_id: str, channel: Channel):
+    """Update an existing channel"""
     config = load_config()
     if channel_id not in config["channels"]:
         raise HTTPException(status_code=404)
@@ -285,6 +352,7 @@ def update_channel(channel_id: str, channel: Channel):
 
 @app.delete("/channels/{channel_id}")
 def delete_channel(channel_id: str):
+    """Delete a channel"""
     config = load_config()
     if channel_id not in config["channels"]:
         raise HTTPException(status_code=404)
@@ -304,6 +372,7 @@ def delete_channel(channel_id: str):
 
 @app.put("/channels/{channel_id}/start")
 def start_channel(channel_id: str):
+    """Start a specific channel"""
     config = load_config()
     if channel_id not in config["channels"]:
         raise HTTPException(status_code=404)
@@ -322,6 +391,7 @@ def start_channel(channel_id: str):
 
 @app.put("/channels/{channel_id}/stop")
 def stop_channel(channel_id: str):
+    """Stop a specific channel"""
     config = load_config()
     if channel_id not in config["channels"]:
         raise HTTPException(status_code=404)
@@ -336,19 +406,35 @@ def stop_channel(channel_id: str):
 
 @app.get("/channels/{channel_id}/metrics")
 def get_channel_metrics(channel_id: str):
-    config = load_config()
-    if channel_id not in config["channels"]:
-        raise HTTPException(status_code=404)
-    
-    channel = config["channels"][channel_id]
+    """
+    Retrieve metrics for a specific channel with caching and error handling
+    """
     try:
-        response = requests.get(f"http://localhost:{channel['metrics_port']}/metrics")
-        return parse_prometheus_metrics(response.text)
+        config = load_config()
+        if channel_id not in config["channels"]:
+            logger.error(f"Channel {channel_id} not found")
+            raise HTTPException(status_code=404, detail="Channel not found")
+        
+        channel = config["channels"][channel_id]
+        metrics_port = channel.get('metrics_port')
+        
+        if not metrics_port:
+            logger.error(f"No metrics port configured for channel {channel_id}")
+            raise HTTPException(status_code=500, detail="Metrics port not configured")
+        
+        # Retrieve cached or fresh metrics
+        metrics = get_cached_metrics(channel_id, metrics_port)
+        
+        return metrics
+    
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in metrics retrieval: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="Internal server error retrieving metrics")
 
 @app.get("/channels/{channel_id}/media-info")
 def get_channel_media_info(channel_id: str):
+    """Retrieve media information for a specific channel"""
     config = load_config()
     if channel_id not in config["channels"]:
         raise HTTPException(status_code=404)
@@ -367,12 +453,15 @@ def get_channel_media_info(channel_id: str):
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return json.loads(result.stdout)
     except subprocess.CalledProcessError as e:
+        logger.error(f"FFprobe error for channel {channel_id}: {e.stderr}")
         raise HTTPException(status_code=500, detail=f"FFprobe error: {e.stderr}")
     except json.JSONDecodeError:
+        logger.error(f"Failed to parse FFprobe output for channel {channel_id}")
         raise HTTPException(status_code=500, detail="Failed to parse FFprobe output")
 
 @app.get("/health")
 def health_check():
+    """Provide a health check endpoint"""
     config = load_config()
     return {
         "status": "healthy",
