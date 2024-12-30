@@ -157,9 +157,18 @@ setup_service() {
 # Start services
 start_services() {
     echo "Starting services..."
+    echo "Starting nginx and redis..."
     systemctl restart nginx
-    systemctl start rist-api
     systemctl restart redis-server
+    
+    echo "Ensuring config is in place before starting API..."
+    if [ -f "/root/rist/receiver_config.yaml" ]; then
+        echo "Starting rist-api service..."
+        systemctl start rist-api
+    else
+        echo "ERROR: Config file not found, cannot start rist-api!"
+        exit 1
+    fi
     
     echo "Checking service status..."
     systemctl status rist-api --no-pager
@@ -170,6 +179,17 @@ start_services() {
     ls -la /var/www/html/
 }
 
+# Verify config
+verify_config() {
+    echo "Verifying configuration..."
+    if [ ! -f "/root/rist/receiver_config.yaml" ]; then
+        echo "ERROR: receiver_config.yaml not found!"
+        exit 1
+    fi
+    echo "Config file found and readable:"
+    cat /root/rist/receiver_config.yaml
+}
+
 # Main installation flow
 main() {
     check_root
@@ -177,6 +197,7 @@ main() {
     build_librist
     install_python_deps
     clone_repo
+    verify_config
     setup_web
     setup_tmpfs
     setup_service
