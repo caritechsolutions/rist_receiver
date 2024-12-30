@@ -32,6 +32,13 @@ install_dependencies() {
 build_librist() {
     echo "Building and installing librist..."
     cd /tmp
+    
+    # Clean up any existing librist directory
+    if [ -d "librist" ]; then
+        echo "Removing existing librist directory..."
+        rm -rf librist
+    fi
+    
     git clone https://code.videolan.org/rist/librist.git
     cd librist
     
