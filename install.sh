@@ -35,16 +35,7 @@ build_librist() {
     git clone https://code.videolan.org/rist/librist.git
     cd librist
     
-    # CMake build
-    mkdir -p build
-    cd build
-    cmake ..
-    make -j$(nproc)
-    make install
-    ldconfig
-    
-    # Meson build
-    cd ..
+    # Configure and build with meson/ninja
     meson setup build
     cd build
     ninja
