@@ -70,14 +70,25 @@ install_python_deps() {
     pip3 install -r /tmp/requirements.txt
 }
 
-# Clone repository
+# Clone repository and setup config
 clone_repo() {
     echo "Cloning RIST receiver repository..."
     mkdir -p /root/rist
     cd /root
     rm -rf rist/*
     git clone https://github.com/caritechsolutions/rist_receiver.git rist
+    
+    echo "Setting up permissions..."
     chmod -R 755 /root/rist
+    
+    echo "Verifying receiver_config..."
+    if [ -f "/root/rist/receiver_config" ]; then
+        echo "receiver_config found"
+        cat /root/rist/receiver_config
+    else
+        echo "WARNING: receiver_config not found!"
+        ls -la /root/rist/
+    fi
 }
 
 # Set up web directory
@@ -86,17 +97,22 @@ setup_web() {
     
     # Unmount content directory if it's mounted
     if mountpoint -q /var/www/html/content; then
+        echo "Unmounting existing content directory..."
         umount /var/www/html/content
     fi
     
-    # Now safe to remove contents
+    echo "Clearing web directory..."
     rm -rf /var/www/html/*
+    
+    echo "Copying web files..."
     cp -r /root/rist/web/* /var/www/html/
     
     # Create content directory if it doesn't exist
+    echo "Creating content directory..."
     mkdir -p /var/www/html/content
     
     # Set permissions
+    echo "Setting web permissions..."
     chmod -R 777 /var/www/html
 }
 
@@ -122,13 +138,18 @@ setup_tmpfs() {
 setup_service() {
     echo "Setting up systemd service..."
     
-    # Create log directory
+    echo "Creating log directory..."
     mkdir -p /var/log/ristreceiver
     chmod 755 /var/log/ristreceiver
     
+    echo "Installing service file..."
     cp /root/rist/services/rist-api.service /etc/systemd/system/
+    
     # Update service file to use correct path
+    echo "Updating service paths..."
     sed -i 's|/opt/rist_receiver|/root/rist|g' /etc/systemd/system/rist-api.service
+    
+    echo "Reloading systemd..."
     systemctl daemon-reload
     systemctl enable rist-api.service
 }
@@ -139,6 +160,14 @@ start_services() {
     systemctl restart nginx
     systemctl start rist-api
     systemctl restart redis-server
+    
+    echo "Checking service status..."
+    systemctl status rist-api --no-pager
+    
+    echo "Checking critical files and directories..."
+    ls -la /root/rist/
+    ls -la /var/log/ristreceiver/
+    ls -la /var/www/html/
 }
 
 # Main installation flow
