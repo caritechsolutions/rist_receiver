@@ -3,6 +3,9 @@
 # Exit on error
 set -e
 
+# Clean up any previous installation attempts
+rm -rf /tmp/librist
+
 echo "Starting RIST Receiver installation..."
 
 # Function to check if script is run as root
@@ -11,6 +14,14 @@ check_root() {
         echo "This script must be run as root" 1>&2
         exit 1
     fi
+}
+
+# Function to download with cache bypass
+download_file() {
+    local url="$1"
+    local output="$2"
+    local timestamp=$(date +%s)
+    curl -sSL "${url}?v=${timestamp}" -o "$output"
 }
 
 # Update system and install dependencies
@@ -22,8 +33,7 @@ install_dependencies() {
     # Install git if not present
     apt-get install -y git
     
-    # Install system packages from repository
-    # Base system packages that are definitely in apt
+    # Install system packages
     apt-get install -y python3 python3-pip python3-dev python3-psutil python3-yaml build-essential \
     cmake pkg-config meson ninja-build graphviz nginx redis-server libmicrohttpd-dev ffmpeg
 }
@@ -55,7 +65,7 @@ build_librist() {
 # Install Python dependencies
 install_python_deps() {
     echo "Installing Python dependencies..."
-    wget -O /tmp/requirements.txt https://raw.githubusercontent.com/caritechsolutions/rist_receiver/main/requirements.txt
+    download_file "https://raw.githubusercontent.com/caritechsolutions/rist_receiver/main/requirements.txt" "/tmp/requirements.txt"
     pip3 install -r /tmp/requirements.txt
 }
 
@@ -63,6 +73,7 @@ install_python_deps() {
 clone_repo() {
     echo "Cloning RIST receiver repository..."
     cd /opt
+    rm -rf rist_receiver
     git clone https://github.com/caritechsolutions/rist_receiver.git
     cd rist_receiver
 }
