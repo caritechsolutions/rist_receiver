@@ -70,35 +70,46 @@ install_python_deps() {
     pip3 install -r /tmp/requirements.txt
 }
 
-# Clone repository and setup config
+# Clone repository
 clone_repo() {
     echo "Cloning RIST receiver repository..."
     mkdir -p /root/rist
     cd /root
     rm -rf rist/*
     git clone https://github.com/caritechsolutions/rist_receiver.git rist
-    
-    echo "Setting up permissions..."
     chmod -R 755 /root/rist
+}
+
+# Stop all RIST services
+stop_services() {
+    echo "Stopping all RIST services..."
+    # Stop any running channel services
+    for service in $(systemctl list-units --full --all | grep "rist-channel-" | awk '{print $1}'); do
+        echo "Stopping $service"
+        systemctl stop "$service"
+    done
     
-    echo "Verifying receiver_config..."
-    if [ -f "/root/rist/receiver_config" ]; then
-        echo "receiver_config found"
-        cat /root/rist/receiver_config
-    else
-        echo "WARNING: receiver_config not found!"
-        ls -la /root/rist/
-    fi
+    # Stop main API service
+    systemctl stop rist-api
+
+    # Wait a moment for processes to clean up
+    sleep 2
 }
 
 # Set up web directory
 setup_web() {
     echo "Setting up web directory..."
     
+    # Stop services before unmounting
+    stop_services
+    
     # Unmount content directory if it's mounted
     if mountpoint -q /var/www/html/content; then
-        echo "Unmounting existing content directory..."
-        umount /var/www/html/content
+        echo "Unmounting content directory..."
+        umount /var/www/html/content || {
+            echo "Normal unmount failed, trying force unmount..."
+            umount -f /var/www/html/content
+        }
     fi
     
     echo "Clearing web directory..."
@@ -134,6 +145,17 @@ setup_tmpfs() {
     fi
 }
 
+# Verify config
+verify_config() {
+    echo "Verifying configuration..."
+    if [ ! -f "/root/rist/receiver_config.yaml" ]; then
+        echo "ERROR: receiver_config.yaml not found!"
+        exit 1
+    fi
+    echo "Config file found and readable:"
+    cat /root/rist/receiver_config.yaml
+}
+
 # Set up API service
 setup_service() {
     echo "Setting up systemd service..."
@@ -165,29 +187,12 @@ start_services() {
     if [ -f "/root/rist/receiver_config.yaml" ]; then
         echo "Starting rist-api service..."
         systemctl start rist-api
+        echo "Checking service status..."
+        systemctl status rist-api --no-pager
     else
         echo "ERROR: Config file not found, cannot start rist-api!"
         exit 1
     fi
-    
-    echo "Checking service status..."
-    systemctl status rist-api --no-pager
-    
-    echo "Checking critical files and directories..."
-    ls -la /root/rist/
-    ls -la /var/log/ristreceiver/
-    ls -la /var/www/html/
-}
-
-# Verify config
-verify_config() {
-    echo "Verifying configuration..."
-    if [ ! -f "/root/rist/receiver_config.yaml" ]; then
-        echo "ERROR: receiver_config.yaml not found!"
-        exit 1
-    fi
-    echo "Config file found and readable:"
-    cat /root/rist/receiver_config.yaml
 }
 
 # Main installation flow
