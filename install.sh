@@ -83,6 +83,13 @@ clone_repo() {
 # Set up web directory
 setup_web() {
     echo "Setting up web directory..."
+    
+    # Unmount content directory if it's mounted
+    if mountpoint -q /var/www/html/content; then
+        umount /var/www/html/content
+    fi
+    
+    # Now safe to remove contents
     rm -rf /var/www/html/*
     cp -r /root/rist/web/* /var/www/html/
     
