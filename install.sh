@@ -121,6 +121,11 @@ setup_tmpfs() {
 # Set up API service
 setup_service() {
     echo "Setting up systemd service..."
+    
+    # Create log directory
+    mkdir -p /var/log/ristreceiver
+    chmod 755 /var/log/ristreceiver
+    
     cp /root/rist/services/rist-api.service /etc/systemd/system/
     # Update service file to use correct path
     sed -i 's|/opt/rist_receiver|/root/rist|g' /etc/systemd/system/rist-api.service
