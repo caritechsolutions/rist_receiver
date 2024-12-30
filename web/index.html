@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>RIST Channel Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            background: #f4f4f4;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .add-button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .add-button:hover {
+            background: #45a049;
+        }
+
+        .channel-list {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .channel-list th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+            color: #333;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .channel-list td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .channel-list tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .status.active {
+            background: #e3f2e6;
+            color: #2d862f;
+        }
+
+        .status.error {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.inactive {
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        .error-message {
+            font-size: 0.8em;
+            color: #dc3545;
+            margin-top: 4px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.2s;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-start {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-stop {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-delete {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-edit {
+            background: #ffc107;
+            color: #000;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        .metrics-port {
+            color: #666;
+            font-size: 0.9em;
+            font-family: monospace;
+        }
+
+        .channel-link {
+            color: #2b6cb0;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .channel-link:hover {
+            text-decoration: underline;
+        }
+
+        .no-channels {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>RIST Channel Manager</h1>
+            <a href="channel_config.html" class="add-button">Add Channel</a>
+        </header>
+
+        <table class="channel-list">
+            <thead>
+                <tr>
+                    <th>Channel Name</th>
+                    <th>Input</th>
+                    <th>Output</th>
+                    <th>Status</th>
+                    <th>Metrics Port</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Table content will be populated by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // const API_BASE = 'http://192.168.12.170:5000';
+           const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
+
+        function createChannelRow(channelId, channel) {
+            const statusClass = channel.status === 'running' ? 'active' : 
+                              channel.status === 'error' ? 'error' : 'inactive';
+            const statusText = channel.status === 'running' ? 'Running' : 
+                             channel.status === 'error' ? 'Error' : 'Stopped';
+            
+            return `
+                <tr data-channel-id="${channelId}">
+                    <td><a href="stats.html?channel=${channelId}" class="channel-link">${channel.name}</a></td>
+                    <td>${channel.input}</td>
+                    <td>${channel.output}</td>
+                    <td>
+                        <span class="status ${statusClass}">${statusText}</span>
+                        ${channel.last_error ? `<div class="error-message">${channel.last_error}</div>` : ''}
+                    </td>
+                    <td><span class="metrics-port">${channel.metrics_port}</span></td>
+                    <td class="actions">
+                        <button class="btn ${channel.status === 'running' ? 'btn-stop' : 'btn-start'}" 
+                                onclick="channelManager.handleToggleChannel('${channelId}')"
+                                ${channel.status === 'processing' ? 'disabled' : ''}>
+                            ${channel.status === 'running' ? 'Stop' : 'Start'}
+                        </button>
+                        <a href="edit.html?channel=${channelId}" class="btn btn-edit">Edit</a>
+                        <button class="btn btn-delete" 
+                                onclick="channelManager.handleDeleteChannel('${channelId}')">Delete</button>
+                    </td>
+                </tr>
+            `;
+        }
+
+        class ChannelManager {
+            constructor() {
+                this.channels = {};
+                this.pollingInterval = null;
+                this.isPolling = false;
+            }
+
+            async loadChannels(forceRefresh = false) {
+                if (this.isPolling) return;
+
+                try {
+                    this.isPolling = true;
+                    const response = await fetch(`${API_BASE}/channels`, {
+                        cache: 'no-store',
+                        headers: {
+                            'Cache-Control': 'no-cache',
+                            'Pragma': 'no-cache'
+                        }
+                    });
+                    const channels = await response.json();
+                    
+                    const tbody = document.querySelector('.channel-list tbody');
+                    
+                    if (Object.keys(channels).length === 0) {
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="6" class="no-channels">
+                                    No channels configured. Click "Add Channel" to create one.
+                                </td>
+                            </tr>
+                        `;
+                        return;
+                    }
+
+                    if (forceRefresh) {
+                        tbody.innerHTML = '';
+                        Object.entries(channels).forEach(([channelId, channel]) => {
+                            this.channels[channelId] = channel;
+                            tbody.insertAdjacentHTML('beforeend', createChannelRow(channelId, channel));
+                        });
+                    } else {
+                        // Update only changed rows
+                        Object.entries(channels).forEach(([channelId, channel]) => {
+                            const existingRow = tbody.querySelector(`tr[data-channel-id="${channelId}"]`);
+                            if (!existingRow || JSON.stringify(this.channels[channelId]) !== JSON.stringify(channel)) {
+                                if (existingRow) {
+                                    existingRow.outerHTML = createChannelRow(channelId, channel);
+                                } else {
+                                    tbody.insertAdjacentHTML('beforeend', createChannelRow(channelId, channel));
+                                }
+                                this.channels[channelId] = channel;
+                            }
+                        });
+                    }
+
+                } catch (error) {
+                    console.error('Error loading channels:', error);
+                } finally {
+                    this.isPolling = false;
+                }
+            }
+
+            async handleDeleteChannel(channelId) {
+                if (!confirm('Are you sure you want to delete this channel?')) return;
+                
+                try {
+                    const response = await fetch(`${API_BASE}/channels/${channelId}`, {
+                        method: 'DELETE',
+                        cache: 'no-store',
+                        headers: {
+                            'Cache-Control': 'no-cache',
+                            'Pragma': 'no-cache'
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Failed to delete channel');
+                    }
+                    
+                    await this.loadChannels(true);
+                } catch (error) {
+                    console.error('Error deleting channel:', error);
+                    alert(`Error deleting channel: ${error.message}`);
+                }
+            }
+
+            async handleToggleChannel(channelId) {
+                const channel = this.channels[channelId];
+                const isStarting = channel.status !== 'running';
+                const button = document.querySelector(`tr[data-channel-id="${channelId}"] .btn-${isStarting ? 'start' : 'stop'}`);
+                
+                if (button.disabled) return;
+                
+                button.disabled = true;
+                button.textContent = isStarting ? 'Starting...' : 'Stopping...';
+                
+                try {
+                    const response = await fetch(
+                        `${API_BASE}/channels/${channelId}/${isStarting ? 'start' : 'stop'}`,
+                        { 
+                            method: 'PUT',
+                            cache: 'no-store',
+                            headers: {
+                                'Cache-Control': 'no-cache',
+                                'Pragma': 'no-cache'
+                            }
+                        }
+                    );
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || `Failed to ${isStarting ? 'start' : 'stop'} channel`);
+                    }
+
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    await this.loadChannels(true);
+                    
+                } catch (error) {
+                    console.error('Error updating channel status:', error);
+                    alert(`Error ${isStarting ? 'starting' : 'stopping'} channel: ${error.message}`);
+                    button.disabled = false;
+                    button.textContent = isStarting ? 'Start' : 'Stop';
+                }
+            }
+
+            startPolling(interval = 5000) {
+                if (this.pollingInterval) {
+                    clearInterval(this.pollingInterval);
+                }
+                
+                this.pollingInterval = setInterval(() => this.loadChannels(), interval);
+            }
+
+            stopPolling() {
+                if (this.pollingInterval) {
+                    clearInterval(this.pollingInterval);
+                    this.pollingInterval = null;
+                }
+            }
+        }
+
+        const channelManager = new ChannelManager();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            channelManager.loadChannels(true);
+            channelManager.startPolling();
+
+            window.addEventListener('unload', () => {
+                channelManager.stopPolling();
+            });
+        });
+    </script>
+</body>
+</html>

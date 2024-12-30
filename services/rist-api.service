@@ -1,0 +1,14 @@
+[Unit]
+Description=RIST API Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/rist
+ExecStart=/usr/bin/python3 /root/rist/rist_api.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

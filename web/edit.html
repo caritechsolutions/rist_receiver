@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit RIST Receiver Channel</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-md mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
+            <div class="px-6 py-4">
+                <h2 class="text-2xl font-bold mb-4">Edit Channel</h2>
+                <form id="editForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Channel Name</label>
+                        <input type="text" id="name" required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Input URL</label>
+                        <input type="text" id="input" required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Output URL</label>
+                        <input type="text" id="output" required
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Metrics Port</label>
+                        <input type="number" id="metrics_port" required min="1024" max="65535"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+                    
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="text-lg font-medium mb-3">RIST Settings</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Profile</label>
+                                <select id="profile" required
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <option value="0">Simple (0)</option>
+                                    <option value="1">Main (1)</option>
+                                    <option value="2">Advanced (2)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Virtual Source Port</label>
+                                <input type="number" id="virt_src_port" min="1" max="65535"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Buffer Size (ms)</label>
+                                <input type="number" id="buffer" required min="0" value="500"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Encryption Type</label>
+                                <select id="encryption_type"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <option value="">None</option>
+                                    <option value="128">AES-128</option>
+                                    <option value="256">AES-256</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Encryption Secret</label>
+                                <input type="password" id="secret"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-4">
+                        <a href="/" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Cancel</a>
+                        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // const API_BASE = 'http://192.168.12.170:5000';
+        const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
+        const channelId = new URLSearchParams(window.location.search).get('channel');
+
+        async function loadChannel() {
+            try {
+                const response = await fetch(`${API_BASE}/channels/${channelId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to load channel');
+                }
+                
+                const channel = await response.json();
+                
+                // Main channel settings
+                document.getElementById('name').value = channel.name;
+                document.getElementById('input').value = channel.input;
+                document.getElementById('output').value = channel.output;
+                document.getElementById('metrics_port').value = channel.metrics_port;
+                
+                // RIST settings
+                document.getElementById('profile').value = channel.settings.profile;
+                document.getElementById('virt_src_port').value = channel.settings.virt_src_port || '';
+                document.getElementById('buffer').value = channel.settings.buffer;
+                document.getElementById('encryption_type').value = channel.settings.encryption_type || '';
+                document.getElementById('secret').value = channel.settings.secret || '';
+                
+            } catch (error) {
+                console.error('Error loading channel:', error);
+                alert('Error loading channel data');
+            }
+        }
+
+        document.getElementById('editForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                name: document.getElementById('name').value,
+                enabled: true,
+                input: document.getElementById('input').value,
+                output: document.getElementById('output').value,
+                metrics_port: parseInt(document.getElementById('metrics_port').value),
+                settings: {
+                    profile: parseInt(document.getElementById('profile').value),
+                    virt_src_port: document.getElementById('virt_src_port').value ? 
+                        parseInt(document.getElementById('virt_src_port').value) : null,
+                    buffer: parseInt(document.getElementById('buffer').value),
+                    encryption_type: document.getElementById('encryption_type').value ? 
+                        parseInt(document.getElementById('encryption_type').value) : null,
+                    secret: document.getElementById('secret').value || null
+                },
+                status: 'stopped'
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/channels/${channelId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to update channel');
+                }
+                
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Error:', error);
+                alert(`Error updating channel: ${error.message}`);
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', loadChannel);
+    </script>
+</body>
+</html>
