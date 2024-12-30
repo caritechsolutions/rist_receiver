@@ -27,6 +27,32 @@ install_dependencies() {
     xargs apt-get install -y < /tmp/system-packages.txt
 }
 
+# Build and install librist
+build_librist() {
+    echo "Building and installing librist..."
+    cd /tmp
+    git clone https://code.videolan.org/rist/librist.git
+    cd librist
+    
+    # CMake build
+    mkdir -p build
+    cd build
+    cmake ..
+    make -j$(nproc)
+    make install
+    ldconfig
+    
+    # Meson build
+    cd ..
+    meson setup build
+    cd build
+    ninja
+    ninja install
+    ldconfig
+    
+    cd /tmp
+}
+
 # Install Python dependencies
 install_python_deps() {
     echo "Installing Python dependencies..."
@@ -93,6 +119,7 @@ start_services() {
 main() {
     check_root
     install_dependencies
+    build_librist
     install_python_deps
     clone_repo
     setup_web
