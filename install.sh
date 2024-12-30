@@ -23,8 +23,9 @@ install_dependencies() {
     apt-get install -y git
     
     # Install system packages from repository
-    wget -O /tmp/system-packages.txt https://raw.githubusercontent.com/caritechsolutions/rist_receiver/main/system-packages.txt
-    xargs apt-get install -y < /tmp/system-packages.txt
+    # Base system packages that are definitely in apt
+    apt-get install -y python3 python3-pip python3-dev python3-psutil python3-yaml build-essential \
+    cmake pkg-config meson ninja-build graphviz nginx redis-server libmicrohttpd-dev ffmpeg
 }
 
 # Build and install librist
