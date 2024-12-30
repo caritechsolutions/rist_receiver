@@ -5,6 +5,7 @@ set -e
 
 # Clean up any previous installation attempts
 rm -rf /tmp/librist
+rm -rf /root/rist
 
 echo "Starting RIST Receiver installation..."
 
@@ -72,17 +73,18 @@ install_python_deps() {
 # Clone repository
 clone_repo() {
     echo "Cloning RIST receiver repository..."
-    cd /opt
-    rm -rf rist_receiver
-    git clone https://github.com/caritechsolutions/rist_receiver.git
-    cd rist_receiver
+    mkdir -p /root/rist
+    cd /root
+    rm -rf rist/*
+    git clone https://github.com/caritechsolutions/rist_receiver.git rist
+    chmod -R 755 /root/rist
 }
 
 # Set up web directory
 setup_web() {
     echo "Setting up web directory..."
     rm -rf /var/www/html/*
-    cp -r /opt/rist_receiver/web/* /var/www/html/
+    cp -r /root/rist/web/* /var/www/html/
     
     # Create content directory if it doesn't exist
     mkdir -p /var/www/html/content
@@ -112,7 +114,9 @@ setup_tmpfs() {
 # Set up API service
 setup_service() {
     echo "Setting up systemd service..."
-    cp /opt/rist_receiver/services/rist-api.service /etc/systemd/system/
+    cp /root/rist/services/rist-api.service /etc/systemd/system/
+    # Update service file to use correct path
+    sed -i 's|/opt/rist_receiver|/root/rist|g' /etc/systemd/system/rist-api.service
     systemctl daemon-reload
     systemctl enable rist-api.service
 }
