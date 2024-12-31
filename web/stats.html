@@ -13,7 +13,6 @@
                  
     <script>
         let bandwidthChart, iatChart;
-        // const API_BASE = 'http://192.168.12.170:5000';
         const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
         const channelId = new URLSearchParams(window.location.search).get('channel');
         let channelName = '';
@@ -21,7 +20,11 @@
         const bandwidthData = [];
         const timeLabels = [];
         let lastMediaInfoFetch = 0;
+        let lastMetricsFetchTime = 0;
+        const METRICS_FETCH_INTERVAL = 1000; // 1 second between fetch attempts
+        const METRICS_CACHE_DURATION = 1000; // 1 second cache duration
         let mediaInfoElement;
+        let hlsInstance = null;
 
         function formatBytes(bytes, decimals = 2) {
             if (bytes === 0) return '0 Mbps';
@@ -49,26 +52,71 @@
             return 'Bad';
         }
 
-        function initPlayer(channelName, isRunning) {
-            const video = document.getElementById('video');
-            const url = `${window.location.protocol}//${window.location.hostname}/content/${channelName}/playlist.m3u8`;
+        function cleanupHls() {
+            if (hlsInstance) {
+                hlsInstance.destroy();
+                hlsInstance = null;
+            }
+        }
+
+        function initPlayer(channelName, autoplay = false) {
+            cleanupHls();
             
-            if (!isRunning) {
-                video.style.display = 'none';
-                document.getElementById('playerContainer').innerHTML = 
-                    '<div class="flex items-center justify-center h-full text-gray-500">Channel not running</div>';
+            const video = document.getElementById('video');
+            if (!video) {
+                console.error('Video element not found');
                 return;
             }
+
+            const url = `${window.location.protocol}//${window.location.hostname}/content/${channelName}/playlist.m3u8`;
             
-            video.style.display = 'block';
             if (Hls.isSupported()) {
-                const hls = new Hls();
-                hls.loadSource(url);
-                hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+                hlsInstance = new Hls({
+                    debug: false,
+                    enableWorker: true,
+                    lowLatencyMode: true,
+                    manifestLoadingTimeOut: 10000,
+                    manifestLoadingMaxRetry: 3,
+                    manifestLoadingRetryDelay: 500,
+                });
+
+                hlsInstance.loadSource(url);
+                hlsInstance.attachMedia(video);
+
+                hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() {
+                    console.log('HLS manifest parsed');
+                    if (autoplay) {
+                        video.play().catch(function(error) {
+                            console.log("Play promise failed:", error);
+                        });
+                    }
+                });
+
+                hlsInstance.on(Hls.Events.ERROR, function(event, data) {
+                    console.log('HLS error:', data);
+                    if (data.fatal) {
+                        switch(data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                console.log('Network error, trying to recover');
+                                hlsInstance.startLoad();
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                console.log('Media error, trying to recover');
+                                hlsInstance.recoverMediaError();
+                                break;
+                            default:
+                                console.log('Fatal error, reinitializing player');
+                                cleanupHls();
+                                initPlayer(channelName, autoplay);
+                                break;
+                        }
+                    }
+                });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = url;
-                video.addEventListener('loadedmetadata', () => video.play());
+                video.addEventListener('loadedmetadata', () => {
+                    if (autoplay) video.play();
+                });
             }
         }
 
@@ -81,14 +129,15 @@
                 if (!response.ok) throw new Error('Failed to fetch media info');
                 const mediaInfo = await response.json();
                 
-                // Update media info display
                 if (!mediaInfoElement) {
                     mediaInfoElement = document.createElement('div');
                     mediaInfoElement.className = 'bg-gray-50 rounded p-4 mt-4';
-                    document.getElementById('playerContainer').appendChild(mediaInfoElement);
+                    const playerContainer = document.getElementById('playerContainer');
+                    if (playerContainer) {
+                        playerContainer.appendChild(mediaInfoElement);
+                    }
                 }
 
-                // Extract key stream details
                 const videoStream = mediaInfo.streams.find(s => s.codec_type === 'video');
                 const audioStream = mediaInfo.streams.find(s => s.codec_type === 'audio');
                 const formatInfo = mediaInfo.format;
@@ -179,11 +228,21 @@
             iatChart.update();
 
             // Update player status based on peer connection
-            if (stats.peers > 0 && !document.getElementById('video').src) {
-                initPlayer(channelName, true);
-            } else if (!stats.peers > 0) {
-                document.getElementById('playerContainer').innerHTML = 
-                    '<div class="flex items-center justify-center h-full text-gray-500">Channel not running</div>';
+            const playerContainer = document.getElementById('playerContainer');
+            const videoEl = document.getElementById('video');
+
+            if (stats.peers > 0) {
+                if (!videoEl || !videoEl.src || videoEl.src === '') {
+                    if (playerContainer) {
+                        playerContainer.innerHTML = '<video id="video" controls class="w-full h-full"></video>';
+                        setTimeout(() => initPlayer(channelName, true), 100);
+                    }
+                }
+            } else {
+                cleanupHls();
+                if (playerContainer) {
+                    playerContainer.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">Channel not running</div>';
+                }
             }
         }
 
@@ -254,26 +313,57 @@
                 const channel = await response.json();
                 channelName = channel.name;
                 document.getElementById('channelTitle').textContent = `${channel.name} Statistics`;
+                
+                // Initial player setup
+                const playerContainer = document.getElementById('playerContainer');
+                if (playerContainer) {
+                    playerContainer.innerHTML = '<video id="video" controls class="w-full h-full"></video>';
+                }
             } catch (error) {
                 console.error('Error loading channel info:', error);
             }
         }
 
         async function updateMetrics() {
+            const currentTime = Date.now();
+            
+            // Check if we've recently fetched metrics
+            if (currentTime - lastMetricsFetchTime < METRICS_CACHE_DURATION) {
+                return;
+            }
+
             try {
                 const response = await fetch(`${API_BASE}/channels/${channelId}/metrics`, {
-                    cache: 'no-store',
+                    method: 'GET',
                     headers: {
                         'Cache-Control': 'no-cache'
                     }
                 });
                 
-                if (!response.ok) throw new Error('Failed to fetch metrics');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch metrics');
+                }
+                
                 const metrics = await response.json();
-                updateStats(metrics);
+                
+                // Only update if we have meaningful data
+                if (metrics.peers > 0 || metrics.bandwidth_bps > 0) {
+                    updateStats(metrics);
+                    lastMetricsFetchTime = currentTime;
+                }
             } catch (error) {
                 console.error('Error fetching metrics:', error);
+                const statusBadge = document.getElementById('statusBadge');
+                if (statusBadge) {
+                    statusBadge.className = 'px-3 py-1 rounded-full text-sm font-semibold bg-red-100 text-red-800';
+                    statusBadge.textContent = 'Error';
+                }
             }
+        }
+
+        function scheduleMetricsFetch() {
+            updateMetrics();
+            setTimeout(scheduleMetricsFetch, METRICS_FETCH_INTERVAL);
         }
 
         async function init() {
@@ -281,9 +371,7 @@
                 await loadChannelInfo();
                 initCharts();
                 await updateMetrics();
-                setInterval(updateMetrics, 1000);
-                
-                // Add media info fetch to the initialization
+                scheduleMetricsFetch(); // Replace setInterval with our scheduling function
                 fetchMediaInfo();
                 setInterval(fetchMediaInfo, 30000);
             } catch (error) {
