@@ -5,13 +5,19 @@ import yaml
 import subprocess
 import os
 import requests
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 import logging
 import json
 from datetime import datetime
 import time
 from functools import lru_cache
 import traceback
+import psutil
+import GPUtil
+
+# Global variable to store previous network stats for bandwidth calculation
+previous_network_stats = {}
+previous_network_timestamp = 0
 
 # Comprehensive Logging Configuration
 logging.basicConfig(
@@ -35,6 +41,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Metrics Caching
+metrics_cache = {}
+system_metrics_cache = {}
+
 class RistReceiverSettings(BaseModel):
     profile: int = Field(1, description="RIST profile")
     virt_src_port: Optional[int] = None
@@ -53,8 +63,84 @@ class Channel(BaseModel):
     process_id: Optional[int] = None
     last_error: Optional[str] = None
 
-# Metrics Caching
-metrics_cache = {}
+# Global variable to store previous network stats for bandwidth calculation
+network_stats_history = {}
+
+def calculate_network_bandwidth(current_stats, current_timestamp):
+    """
+    Calculate network bandwidth per second with improved tracking
+    """
+    global network_stats_history
+    
+    # Initialize history if empty
+    if not network_stats_history:
+        for interface, stats in current_stats.items():
+            network_stats_history[interface] = {
+                'timestamps': [current_timestamp],
+                'bytes_sent': [stats['bytes_sent']],
+                'bytes_recv': [stats['bytes_recv']]
+            }
+        
+        return {
+            interface: {
+                'bytes_sent': stats['bytes_sent'],
+                'bytes_recv': stats['bytes_recv'],
+                'bytes_sent_per_sec': 0,
+                'bytes_recv_per_sec': 0
+            } for interface, stats in current_stats.items()
+        }
+    
+    bandwidth_stats = {}
+    
+    for interface, current_interface_stats in current_stats.items():
+        # Retrieve or initialize interface history
+        if interface not in network_stats_history:
+            network_stats_history[interface] = {
+                'timestamps': [current_timestamp],
+                'bytes_sent': [current_interface_stats['bytes_sent']],
+                'bytes_recv': [current_interface_stats['bytes_recv']]
+            }
+            bandwidth_stats[interface] = {
+                'bytes_sent': current_interface_stats['bytes_sent'],
+                'bytes_recv': current_interface_stats['bytes_recv'],
+                'bytes_sent_per_sec': 0,
+                'bytes_recv_per_sec': 0
+            }
+            continue
+        
+        # Add current stats to history
+        history = network_stats_history[interface]
+        history['timestamps'].append(current_timestamp)
+        history['bytes_sent'].append(current_interface_stats['bytes_sent'])
+        history['bytes_recv'].append(current_interface_stats['bytes_recv'])
+        
+        # Keep only recent measurements (last 5 entries)
+        history['timestamps'] = history['timestamps'][-5:]
+        history['bytes_sent'] = history['bytes_sent'][-5:]
+        history['bytes_recv'] = history['bytes_recv'][-5:]
+        
+        # Calculate bandwidth
+        if len(history['timestamps']) > 1:
+            # Use the first and last measurements for bandwidth calculation
+            time_diff = history['timestamps'][-1] - history['timestamps'][0]
+            bytes_sent_diff = history['bytes_sent'][-1] - history['bytes_sent'][0]
+            bytes_recv_diff = history['bytes_recv'][-1] - history['bytes_recv'][0]
+            
+            # Prevent divide by zero and negative values
+            bytes_sent_per_sec = max(0, int(bytes_sent_diff / max(time_diff, 1)))
+            bytes_recv_per_sec = max(0, int(bytes_recv_diff / max(time_diff, 1)))
+        else:
+            bytes_sent_per_sec = 0
+            bytes_recv_per_sec = 0
+        
+        bandwidth_stats[interface] = {
+            'bytes_sent': current_interface_stats['bytes_sent'],
+            'bytes_recv': current_interface_stats['bytes_recv'],
+            'bytes_sent_per_sec': bytes_sent_per_sec,
+            'bytes_recv_per_sec': bytes_recv_per_sec
+        }
+    
+    return bandwidth_stats
 
 def parse_prometheus_metrics(metrics_text: str) -> dict:
     """Parse Prometheus metrics text into structured data"""
@@ -130,6 +216,90 @@ def parse_prometheus_metrics(metrics_text: str) -> dict:
         logger.error(f"Metrics text: {metrics_text}")
     
     return metrics
+
+def get_system_health_metrics(cache_timeout: int = 1):
+    """
+    Retrieve system health metrics with a simple caching mechanism
+    """
+    current_time = time.time()
+    
+    # Check if we have a cached result and it's fresh
+    if (system_metrics_cache and 
+        current_time - system_metrics_cache.get('timestamp', 0) < cache_timeout):
+        return system_metrics_cache['data']
+    
+    try:
+        # CPU Information
+        cpu_percent = psutil.cpu_percent(interval=1)
+        cpu_temps = psutil.sensors_temperatures().get('coretemp', [])
+        cpu_temp = cpu_temps[0].current if cpu_temps else 0
+        cpu_cores = [{'core': i, 'usage': percent} for i, percent in enumerate(psutil.cpu_percent(interval=0.1, percpu=True))]
+
+        # Memory Information
+        memory = psutil.virtual_memory()
+
+        # Disk Information
+        disk = psutil.disk_usage('/')
+
+        # Network Information
+        network_stats = {}
+        for interface, stats in psutil.net_io_counters(pernic=True).items():
+            network_stats[interface] = {
+                'bytes_sent': stats.bytes_sent,
+                'bytes_recv': stats.bytes_recv
+            }
+        
+        # Calculate network bandwidth
+        bandwidth_stats = calculate_network_bandwidth(network_stats, current_time)
+
+        # GPU Information (Optional, requires GPUtil)
+        gpu_info = []
+        try:
+            gpus = GPUtil.getGPUs()
+            for gpu in gpus:
+                gpu_info.append({
+                    'name': gpu.name,
+                    'load': gpu.load * 100,
+                    'memory_used': gpu.memoryUsed,
+                    'memory_total': gpu.memoryTotal,
+                    'temperature': gpu.temperature
+                })
+        except Exception as gpu_error:
+            logger.warning(f"GPU metrics retrieval failed: {gpu_error}")
+
+        # Construct metrics dictionary
+        metrics = {
+            'cpu': {
+                'average': cpu_percent,
+                'cores': cpu_cores
+            },
+            'memory': {
+                'total': memory.total,
+                'used': memory.used,
+                'used_percent': memory.percent
+            },
+            'disk': {
+                'total': disk.total,
+                'used': disk.used,
+                'used_percent': disk.percent
+            },
+            'temperature': round(cpu_temp, 1),
+            'network': bandwidth_stats,
+            'gpu': gpu_info
+        }
+        
+        # Cache the result
+        system_metrics_cache.update({
+            'timestamp': current_time,
+            'data': metrics
+        })
+        
+        return metrics
+    
+    except Exception as e:
+        logger.error(f"Error fetching system health metrics: {e}")
+        logger.error(traceback.format_exc())
+        return {}
 
 def get_cached_metrics(channel_id: str, metrics_port: int, cache_timeout: int = 1):
     """
@@ -458,6 +628,13 @@ def get_channel_media_info(channel_id: str):
     except json.JSONDecodeError:
         logger.error(f"Failed to parse FFprobe output for channel {channel_id}")
         raise HTTPException(status_code=500, detail="Failed to parse FFprobe output")
+
+@app.get("/health/metrics")
+def health_metrics():
+    """
+    Retrieve cached system health metrics
+    """
+    return get_system_health_metrics()
 
 @app.get("/health")
 def health_check():
