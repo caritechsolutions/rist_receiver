@@ -67,7 +67,7 @@ build_librist() {
 install_python_deps() {
     echo "Installing Python dependencies..."
     download_file "https://raw.githubusercontent.com/caritechsolutions/rist_receiver/main/requirements.txt" "/tmp/requirements.txt"
-    pip3 install -r /tmp/requirements.txt
+    pip3 install --break-system-packages -r /tmp/requirements.txt
 }
 
 # Clone repository
