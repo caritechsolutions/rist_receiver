@@ -91,21 +91,31 @@ clone_repo() {
 
 # Stop all RIST services
 stop_services() {
-    echo "Stopping all RIST services..."
-    # Stop any running channel services
-    for service in $(systemctl list-units --full --all | grep "rist-channel-" | awk '{print $1}'); do
-        echo "Stopping $service"
-        systemctl stop "$service"
-    done
+    echo "Stopping all RIST services (if they exist)..."
     
-    # Stop main API service
-    systemctl stop rist-api
-
-    # Kill any remaining ffmpeg processes
+    # Stop any running channel services
+    if systemctl list-units --full --all | grep -q "rist-channel-"; then
+        for service in $(systemctl list-units --full --all | grep "rist-channel-" | awk '{print $1}'); do
+            echo "Stopping $service"
+            systemctl stop "$service" || echo "Service $service was not running"
+        done
+    else
+        echo "No rist-channel services found"
+    fi
+    
+    # Stop main API service if it exists
+    if systemctl list-unit-files | grep -q "rist-api"; then
+        echo "Stopping rist-api service"
+        systemctl stop rist-api || echo "rist-api service was not running"
+    else
+        echo "No rist-api service found"
+    fi
+    
+    # Kill any remaining ffmpeg processes (pkill with || true already handles non-existent processes)
     echo "Checking for ffmpeg processes..."
     pkill -9 ffmpeg 2>/dev/null || true
     pkill -9 ristreceiver 2>/dev/null || true
-
+    
     # Wait a moment for processes to clean up
     sleep 2
 }
