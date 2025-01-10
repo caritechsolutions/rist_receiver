@@ -66,8 +66,17 @@ build_librist() {
 # Install Python dependencies
 install_python_deps() {
     echo "Installing Python dependencies..."
-    download_file "https://raw.githubusercontent.com/caritechsolutions/rist_receiver/main/requirements.txt" "/tmp/requirements.txt"
-    pip3 install --break-system-packages -r /tmp/requirements.txt
+    apt-get update
+    apt-get install -y \
+        python3-fastapi \
+        python3-flask \
+        python3-flask-cors \
+        python3-psutil \
+        python3-pydantic \
+        python3-yaml \
+        python3-uvicorn \
+        python3-aiofiles
+    # Note: GPUtil might not be available via apt, you may still need pip for that one
 }
 
 # Clone repository
