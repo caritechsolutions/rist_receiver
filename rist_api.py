@@ -14,10 +14,16 @@ from functools import lru_cache
 import traceback
 import psutil
 import GPUtil
+import asyncio
+import uvicorn
+
 
 # Global variable to store previous network stats for bandwidth calculation
 previous_network_stats = {}
 previous_network_timestamp = 0
+
+channel_monitors: Dict[str, asyncio.Task] = {}
+channel_last_active: Dict[str, float] = {}
 
 # Comprehensive Logging Configuration
 logging.basicConfig(
@@ -33,6 +39,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="RIST Receiver API")
 CONFIG_FILE = "receiver_config.yaml"
 SERVICE_DIR = "/etc/systemd/system"
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -344,16 +351,16 @@ def reload_systemd():
         raise HTTPException(status_code=500, detail="Failed to reload systemd")
 
 def generate_service_file(channel_id: str, channel: Dict):
-    """Generate systemd service file for a RIST channel"""
+    """Generate separate systemd service files for RIST and FFmpeg"""
     input_url = channel["input"]
     if channel["settings"].get("virt_src_port"):
         input_url += f"?virt-dst-port={channel['settings']['virt_src_port']}"
 
     log_port = channel['metrics_port'] + 1000
     stream_path = f"/var/www/html/content/{channel['name']}"
-
-    # Construct command parts for ristreceiver
-    cmd_parts = [
+    
+    # RIST service components
+    rist_cmd_parts = [
         "/usr/local/bin/ristreceiver",
         f"-p {channel['settings']['profile']}",
         f"-i '{input_url}'",
@@ -368,23 +375,22 @@ def generate_service_file(channel_id: str, channel: Dict):
 
     # Add optional parameters
     if channel["settings"].get("buffer"):
-        cmd_parts.append(f"-b {channel['settings']['buffer']}")
+        rist_cmd_parts.append(f"-b {channel['settings']['buffer']}")
     
     if channel["settings"].get("encryption_type"):
-        cmd_parts.append(f"-e {channel['settings']['encryption_type']}")
+        rist_cmd_parts.append(f"-e {channel['settings']['encryption_type']}")
     
     if channel["settings"].get("secret"):
-        cmd_parts.append(f"-s {channel['settings']['secret']}")
+        rist_cmd_parts.append(f"-s {channel['settings']['secret']}")
 
-    # Create systemd service content
-    service_content = f"""[Unit]
+    # RIST Service
+    rist_service = f"""[Unit]
 Description=RIST Channel {channel['name']}
 After=network.target
 
 [Service]
 Type=simple
-ExecStartPre=/bin/mkdir -p {stream_path}
-ExecStart=/bin/bash -c 'exec {' '.join(cmd_parts)} & ffmpeg -i {channel["output"]} -c copy -hls_time 5 -hls_list_size 5 -hls_flags delete_segments {stream_path}/playlist.m3u8'
+ExecStart={' '.join(rist_cmd_parts)}
 Restart=always
 RestartSec=3
 StandardOutput=append:/var/log/ristreceiver/receiver_{channel_id}.log
@@ -394,23 +400,52 @@ StandardError=append:/var/log/ristreceiver/receiver_{channel_id}.log
 WantedBy=multi-user.target
 """
 
-    service_file = f"{SERVICE_DIR}/rist-channel-{channel_id}.service"
-    try:
-        with open(service_file, "w") as f:
-            f.write(service_content)
-    except Exception as e:
-        logger.error(f"Failed to write service file: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to create service file")
+    # FFmpeg Service for diagnostic preview
+    ffmpeg_service = f"""[Unit]
+Description=FFmpeg HLS for Channel {channel['name']}
+After=rist-channel-{channel_id}.service
+BindsTo=rist-channel-{channel_id}.service
 
-    reload_systemd()
+[Service]
+Type=simple
+ExecStartPre=/bin/bash -c "mkdir -p {stream_path} && rm -f {stream_path}/*.ts {stream_path}/*.m3u8"
+ExecStart=ffmpeg -i {channel['output']} -c copy -hls_time 5 -hls_list_size 5 -hls_flags delete_segments {stream_path}/playlist.m3u8
+ExecStopPost=/bin/bash -c "rm -f {stream_path}/*.ts {stream_path}/*.m3u8"
+Restart=always
+RestartSec=3
+StandardOutput=append:/var/log/ristreceiver/ffmpeg_{channel_id}.log
+StandardError=append:/var/log/ristreceiver/ffmpeg_{channel_id}.log
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+    os.makedirs("/var/log/ristreceiver", exist_ok=True)
+
+    # Write RIST service
+    rist_file = f"{SERVICE_DIR}/rist-channel-{channel_id}.service"
+    try:
+        with open(rist_file, "w") as f:
+            f.write(rist_service)
+    except Exception as e:
+        logger.error(f"Failed to write RIST service file: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create RIST service file")
+
+    # Write FFmpeg service
+    ffmpeg_file = f"{SERVICE_DIR}/ffmpeg-{channel_id}.service"
+    try:
+        with open(ffmpeg_file, "w") as f:
+            f.write(ffmpeg_service)
+    except Exception as e:
+        logger.error(f"Failed to write FFmpeg service file: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create FFmpeg service file")
+
+    subprocess.run(["systemctl", "daemon-reload"], check=True)
     
     if channel['enabled']:
-        try:
-            subprocess.run(["systemctl", "enable", f"rist-channel-{channel_id}.service"], 
-                         check=True, capture_output=True)
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to enable service: {e.stderr.decode()}")
-            raise HTTPException(status_code=500, detail="Failed to enable service")
+        subprocess.run(["systemctl", "enable", f"rist-channel-{channel_id}.service"], check=True)
+        
+
 
 def get_channel_status(channel_id: str) -> str:
     """Get the status of a channel's systemd service"""
@@ -439,10 +474,38 @@ def load_config():
     with open(CONFIG_FILE, 'r') as f:
         return yaml.safe_load(f)
 
+
+
 def save_config(config):
     """Save configuration to YAML file"""
     with open(CONFIG_FILE, 'w') as f:
         yaml.dump(config, f)
+
+
+@app.on_event("startup")
+def startup_event():
+    @app.get("/")
+    def wait_for_startup():
+        return {"status": "ready"}
+
+    import threading
+    import time
+    import requests
+
+    def perform_keepalive():
+        # Wait a bit to ensure server is fully up
+        time.sleep(2)
+        
+        config = load_config()
+        for channel_id in config["channels"]:
+            try:
+                response = requests.post(f"http://localhost:5000/channels/{channel_id}/keepalive")
+                print(f"Keepalive for {channel_id}: {response.status_code}")
+            except Exception as e:
+                print(f"Keepalive failed for channel {channel_id}: {str(e)}")
+
+    # Run keepalive in a separate thread
+    threading.Thread(target=perform_keepalive, daemon=True).start()
 
 @app.get("/channels")
 def get_channels():
@@ -504,6 +567,8 @@ def update_channel(channel_id: str, channel: Channel):
     config = load_config()
     if channel_id not in config["channels"]:
         raise HTTPException(status_code=404)
+
+    logger.info(f"Starting channel update for {channel_id}")
     
     channel_dict = channel.dict()
     config["channels"][channel_id] = channel_dict
@@ -511,68 +576,153 @@ def update_channel(channel_id: str, channel: Channel):
     
     generate_service_file(channel_id, channel_dict)
     
-    try:
-        subprocess.run(["systemctl", "restart", f"rist-channel-{channel_id}.service"],
-                      check=True, capture_output=True)
-    except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, 
-                          detail=f"Failed to restart service: {e.stderr.decode()}")
+    if get_channel_status(channel_id) == "running":
+        try:
+            subprocess.run(["systemctl", "restart", f"rist-channel-{channel_id}.service"], check=True)
+            channel_keepalive(channel_id)  # This will start FFmpeg if needed
+        except subprocess.CalledProcessError as e:
+            raise HTTPException(status_code=500, 
+                          detail=f"Failed to restart services: {e.stderr}")
     
     return channel_dict
 
-@app.delete("/channels/{channel_id}")
-def delete_channel(channel_id: str):
-    """Delete a channel"""
-    config = load_config()
-    if channel_id not in config["channels"]:
-        raise HTTPException(status_code=404)
-    
-    service_name = f"rist-channel-{channel_id}.service"
-    try:
-        subprocess.run(["systemctl", "stop", service_name], check=True, capture_output=True)
-        subprocess.run(["systemctl", "disable", service_name], check=True, capture_output=True)
-        os.remove(f"{SERVICE_DIR}/{service_name}")
-    except Exception as e:
-        logger.error(f"Failed to remove service: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to remove service")
-    
-    del config["channels"][channel_id]
-    save_config(config)
-    return {"status": "deleted"}
-
 @app.put("/channels/{channel_id}/start")
 def start_channel(channel_id: str):
-    """Start a specific channel"""
+    """Start RIST and FFmpeg services"""
     config = load_config()
     if channel_id not in config["channels"]:
         raise HTTPException(status_code=404)
     
-    service_file = f"{SERVICE_DIR}/rist-channel-{channel_id}.service"
-    if not os.path.exists(service_file):
-        generate_service_file(channel_id, config["channels"][channel_id])
-        
     try:
-        subprocess.run(["systemctl", "start", f"rist-channel-{channel_id}.service"],
-                      check=True, capture_output=True)
+        subprocess.run(["systemctl", "start", f"rist-channel-{channel_id}.service"], check=True)
+        channel_keepalive(channel_id)  # This will start FFmpeg if needed
         return {"status": "started"}
     except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, 
-                          detail=f"Failed to start service: {e.stderr.decode()}")
+        raise HTTPException(status_code=500, detail=f"Failed to start services: {e.stderr}")
 
 @app.put("/channels/{channel_id}/stop")
 def stop_channel(channel_id: str):
-    """Stop a specific channel"""
+    """Stop RIST and FFmpeg services"""
     config = load_config()
     if channel_id not in config["channels"]:
         raise HTTPException(status_code=404)
     
     try:
-        subprocess.run(["systemctl", "stop", f"rist-channel-{channel_id}.service"],
-                      check=True, capture_output=True)
+        # FFmpeg will stop automatically due to BindsTo
+        subprocess.run(["systemctl", "stop", f"rist-channel-{channel_id}.service"], check=True)
         return {"status": "stopped"}
     except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, 
-                          detail=f"Failed to stop service: {e.stderr.decode()}")
+        raise HTTPException(status_code=500, detail=f"Failed to stop services: {e.stderr}")
+
+@app.delete("/channels/{channel_id}")
+def delete_channel(channel_id: str):
+    """Delete a channel and its services"""
+    config = load_config()
+    if channel_id not in config["channels"]:
+        raise HTTPException(status_code=404)
+    
+    try:
+        # Stop and disable both services
+        for service in [f"rist-channel-{channel_id}.service", f"ffmpeg-{channel_id}.service"]:
+            try:
+                subprocess.run(["systemctl", "stop", service], check=True)
+                subprocess.run(["systemctl", "disable", service], check=True)
+                os.remove(f"{SERVICE_DIR}/{service}")
+            except Exception as e:
+                logger.error(f"Failed to remove service {service}: {str(e)}")
+        
+        del config["channels"][channel_id]
+        save_config(config)
+        return {"status": "deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to delete channel")
+
+
+async def stop_ffmpeg(channel_id: str):
+    """Stop FFmpeg service for a channel"""
+    try:
+        subprocess.run(["systemctl", "stop", f"ffmpeg-{channel_id}.service"], check=True)
+        logger.info(f"Stopped FFmpeg for channel {channel_id}")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to stop FFmpeg for channel {channel_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to stop FFmpeg service: {e.stderr}")
+
+async def start_ffmpeg(channel_id: str):
+    """Start FFmpeg service for a channel"""
+    try:
+        subprocess.run(["systemctl", "start", f"ffmpeg-{channel_id}.service"], check=True)
+        logger.info(f"Started FFmpeg for channel {channel_id}")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to start FFmpeg for channel {channel_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start FFmpeg service: {e.stderr}")
+
+def is_ffmpeg_running(channel_id: str) -> bool:
+    """Check if FFmpeg service is running"""
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-active", f"ffmpeg-{channel_id}.service"],
+            capture_output=True,
+            text=True
+        )
+        return result.stdout.strip() == "active"
+    except Exception:
+        return False
+
+async def monitor_channel_activity(channel_id: str):
+    """Monitor channel activity and stop FFmpeg if inactive"""
+    logger.info(f"Starting activity monitor for channel {channel_id}")
+    try:
+        while True:
+            if time.time() - channel_last_active[channel_id] > 120:
+                logger.info(f"Channel {channel_id} inactive, stopping FFmpeg")
+                await stop_ffmpeg(channel_id)
+                del channel_monitors[channel_id]
+                del channel_last_active[channel_id]
+                break
+            await asyncio.sleep(30)
+    except Exception as e:
+        logger.error(f"Error in monitor for channel {channel_id}: {e}")
+        # Cleanup in case of error
+        if channel_id in channel_monitors:
+            del channel_monitors[channel_id]
+        if channel_id in channel_last_active:
+            del channel_last_active[channel_id]
+
+@app.post("/channels/{channel_id}/keepalive")
+async def channel_keepalive(channel_id: str):
+    """Handle keepalive request for channel"""
+    config = load_config()
+    if channel_id not in config["channels"]:
+        raise HTTPException(status_code=404, detail="Channel not found")
+        
+    channel_last_active[channel_id] = time.time()
+    
+    if channel_id not in channel_monitors:
+        # Start FFmpeg if not running
+        if not is_ffmpeg_running(channel_id):
+            await start_ffmpeg(channel_id)
+        # Start new monitor task
+        channel_monitors[channel_id] = asyncio.create_task(
+            monitor_channel_activity(channel_id)
+        )
+        logger.info(f"Started new monitor for channel {channel_id}")
+    
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+
+@app.put("/channels/{channel_id}/ffmpeg/restart")
+def restart_ffmpeg(channel_id: str):
+    """Restart FFmpeg service for a channel"""
+    config = load_config()
+    if channel_id not in config["channels"]:
+        raise HTTPException(status_code=404)
+    
+    try:
+        subprocess.run(["systemctl", "restart", f"ffmpeg-{channel_id}.service"], check=True)
+        return {"status": "restarted"}
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to restart FFmpeg service: {e.stderr}")
+
 
 @app.get("/channels/{channel_id}/metrics")
 def get_channel_metrics(channel_id: str):
@@ -646,6 +796,9 @@ def health_check():
         "channels": len(config["channels"])
     }
 
+
+
 if __name__ == "__main__":
     import uvicorn
+    
     uvicorn.run(app, host="0.0.0.0", port=5000)
