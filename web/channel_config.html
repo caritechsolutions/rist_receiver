@@ -29,17 +29,17 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Virtual Port</label>
-                        <input type="number" id="virt_port" required min="1" max="65535"
+                        <input type="number" id="virt_port" required min="1" max="65535" value="4602"
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Multicast IP</label>
-                        <input type="text" id="multicast_ip" required pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
+                        <input type="text" id="multicast_ip" required pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" value="224.2.2.2"
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700">Multicast Port</label>
-                        <input type="number" id="multicast_port" required min="1" max="65535"
+                        <input type="number" id="multicast_port" required min="1" max="65535" value="10000"
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                     </div>
                     <div class="flex justify-end space-x-4">
@@ -113,7 +113,7 @@
                     settings: {
                         profile: 1,
                         virt_src_port: parseInt(document.getElementById('virt_port').value),
-                        buffer: 500,
+                        buffer: 1000,
                         encryption_type: null,
                         secret: null
                     },
