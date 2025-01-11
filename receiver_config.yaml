@@ -1,1 +1,16 @@
-
+channels:
+  channel1:
+    enabled: true
+    input: rist://199.71.214.97:59618
+    last_error: null
+    metrics_port: 9201
+    name: ae
+    output: udp://224.2.2.2:10000
+    process_id: null
+    settings:
+      buffer: 1000
+      encryption_type: null
+      profile: 1
+      secret: null
+      virt_src_port: 4601
+    status: stopped
