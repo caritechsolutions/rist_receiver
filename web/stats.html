@@ -13,6 +13,7 @@
                  
     <script>
         let bandwidthChart, iatChart;
+        // const API_BASE = 'http://192.168.12.170:5000';
         const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
         const channelId = new URLSearchParams(window.location.search).get('channel');
         let channelName = '';
@@ -20,11 +21,8 @@
         const bandwidthData = [];
         const timeLabels = [];
         let lastMediaInfoFetch = 0;
-        let lastMetricsFetchTime = 0;
-        const METRICS_FETCH_INTERVAL = 1000; // 1 second between fetch attempts
-        const METRICS_CACHE_DURATION = 1000; // 1 second cache duration
         let mediaInfoElement;
-        let hlsInstance = null;
+        let isInitializingPlayer = false;
 
         function formatBytes(bytes, decimals = 2) {
             if (bytes === 0) return '0 Mbps';
@@ -52,92 +50,97 @@
             return 'Bad';
         }
 
-        function cleanupHls() {
-            if (hlsInstance) {
-                hlsInstance.destroy();
-                hlsInstance = null;
-            }
+
+  let keepaliveInterval;
+
+async function startKeepalive() {
+    try {
+        const response = await fetch(`${API_BASE}/channels/${channelId}/keepalive`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            throw new Error(`Keepalive failed: ${response.status}`);
         }
+    } catch (error) {
+        console.error('Keepalive error:', error);
+    }
+}
 
-        function initPlayer(channelName, autoplay = false) {
-            cleanupHls();
-            
+
+  async function restartFFmpeg() {
+    try {
+        // Get and update button state
+        const button = document.querySelector('[onclick="restartFFmpeg()"]');
+        button.disabled = true;
+        button.classList.add('bg-gray-400');
+        button.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+        button.textContent = 'Restarting...';
+
+        // Make the restart request
+        const response = await fetch(`${API_BASE}/channels/${channelId}/ffmpeg/restart`, {
+            method: 'PUT'
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Failed to restart FFmpeg: ${response.status}`);
+        }
+        
+        // Wait for restart to complete and reload player
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        initPlayer(channelName, true);
+        
+    } catch (error) {
+        console.error('Error restarting FFmpeg:', error);
+        alert('Failed to restart FFmpeg. Please try again.');
+    } finally {
+        // Reset button state
+        const button = document.querySelector('[onclick="restartFFmpeg()"]');
+        button.disabled = false;
+        button.classList.remove('bg-gray-400');
+        button.classList.add('bg-blue-500', 'hover:bg-blue-600');
+        button.textContent = 'Reload Player';
+    }
+}
+        function initPlayer(channelName, isRunning) {
             const video = document.getElementById('video');
-            if (!video) {
-                console.error('Video element not found');
-                return;
-            }
-
             const url = `${window.location.protocol}//${window.location.hostname}/content/${channelName}/playlist.m3u8`;
             
+            if (!isRunning) {
+                video.style.display = 'none';
+                document.getElementById('playerContainer').innerHTML = 
+                    '<div class="flex items-center justify-center h-full text-gray-500">Channel not running</div>';
+                return;
+            }
+            
+            video.style.display = 'block';
             if (Hls.isSupported()) {
-                hlsInstance = new Hls({
-                    debug: false,
-                    enableWorker: true,
-                    lowLatencyMode: true,
-                    manifestLoadingTimeOut: 10000,
-                    manifestLoadingMaxRetry: 3,
-                    manifestLoadingRetryDelay: 500,
-                });
-
-                hlsInstance.loadSource(url);
-                hlsInstance.attachMedia(video);
-
-                hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() {
-                    console.log('HLS manifest parsed');
-                    if (autoplay) {
-                        video.play().catch(function(error) {
-                            console.log("Play promise failed:", error);
-                        });
-                    }
-                });
-
-                hlsInstance.on(Hls.Events.ERROR, function(event, data) {
-                    console.log('HLS error:', data);
-                    if (data.fatal) {
-                        switch(data.type) {
-                            case Hls.ErrorTypes.NETWORK_ERROR:
-                                console.log('Network error, trying to recover');
-                                hlsInstance.startLoad();
-                                break;
-                            case Hls.ErrorTypes.MEDIA_ERROR:
-                                console.log('Media error, trying to recover');
-                                hlsInstance.recoverMediaError();
-                                break;
-                            default:
-                                console.log('Fatal error, reinitializing player');
-                                cleanupHls();
-                                initPlayer(channelName, autoplay);
-                                break;
-                        }
-                    }
-                });
+                const hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = url;
-                video.addEventListener('loadedmetadata', () => {
-                    if (autoplay) video.play();
-                });
+                video.addEventListener('loadedmetadata', () => video.play());
             }
         }
 
         async function fetchMediaInfo() {
             const now = Date.now();
-            if (now - lastMediaInfoFetch < 30000) return;
+            if (now - lastMediaInfoFetch < 60000) return;
 
             try {
                 const response = await fetch(`${API_BASE}/channels/${channelId}/media-info`);
                 if (!response.ok) throw new Error('Failed to fetch media info');
                 const mediaInfo = await response.json();
                 
+                // Update media info display
                 if (!mediaInfoElement) {
                     mediaInfoElement = document.createElement('div');
                     mediaInfoElement.className = 'bg-gray-50 rounded p-4 mt-4';
-                    const playerContainer = document.getElementById('playerContainer');
-                    if (playerContainer) {
-                        playerContainer.appendChild(mediaInfoElement);
-                    }
+                    document.getElementById('playerContainer').appendChild(mediaInfoElement);
                 }
 
+                // Extract key stream details
                 const videoStream = mediaInfo.streams.find(s => s.codec_type === 'video');
                 const audioStream = mediaInfo.streams.find(s => s.codec_type === 'audio');
                 const formatInfo = mediaInfo.format;
@@ -227,23 +230,17 @@
             ];
             iatChart.update();
 
-            // Update player status based on peer connection
-            const playerContainer = document.getElementById('playerContainer');
-            const videoEl = document.getElementById('video');
+if (stats.peers > 0 && !document.getElementById('video').src && !isInitializingPlayer) {
+   isInitializingPlayer = true;
+   setTimeout(() => {
+       initPlayer(channelName, true);
+   }, 10000);
+} else if (!stats.peers > 0) {
+   isInitializingPlayer = false;
+   document.getElementById('playerContainer').innerHTML = 
+       '<div class="flex items-center justify-center h-full text-gray-500">Channel not running</div>';
+}
 
-            if (stats.peers > 0) {
-                if (!videoEl || !videoEl.src || videoEl.src === '') {
-                    if (playerContainer) {
-                        playerContainer.innerHTML = '<video id="video" controls class="w-full h-full"></video>';
-                        setTimeout(() => initPlayer(channelName, true), 100);
-                    }
-                }
-            } else {
-                cleanupHls();
-                if (playerContainer) {
-                    playerContainer.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">Channel not running</div>';
-                }
-            }
         }
 
         function initCharts() {
@@ -313,57 +310,26 @@
                 const channel = await response.json();
                 channelName = channel.name;
                 document.getElementById('channelTitle').textContent = `${channel.name} Statistics`;
-                
-                // Initial player setup
-                const playerContainer = document.getElementById('playerContainer');
-                if (playerContainer) {
-                    playerContainer.innerHTML = '<video id="video" controls class="w-full h-full"></video>';
-                }
             } catch (error) {
                 console.error('Error loading channel info:', error);
             }
         }
 
         async function updateMetrics() {
-            const currentTime = Date.now();
-            
-            // Check if we've recently fetched metrics
-            if (currentTime - lastMetricsFetchTime < METRICS_CACHE_DURATION) {
-                return;
-            }
-
             try {
                 const response = await fetch(`${API_BASE}/channels/${channelId}/metrics`, {
-                    method: 'GET',
+                    cache: 'no-store',
                     headers: {
                         'Cache-Control': 'no-cache'
                     }
                 });
                 
-                if (!response.ok) {
-                    throw new Error('Failed to fetch metrics');
-                }
-                
+                if (!response.ok) throw new Error('Failed to fetch metrics');
                 const metrics = await response.json();
-                
-                // Only update if we have meaningful data
-                if (metrics.peers > 0 || metrics.bandwidth_bps > 0) {
-                    updateStats(metrics);
-                    lastMetricsFetchTime = currentTime;
-                }
+                updateStats(metrics);
             } catch (error) {
                 console.error('Error fetching metrics:', error);
-                const statusBadge = document.getElementById('statusBadge');
-                if (statusBadge) {
-                    statusBadge.className = 'px-3 py-1 rounded-full text-sm font-semibold bg-red-100 text-red-800';
-                    statusBadge.textContent = 'Error';
-                }
             }
-        }
-
-        function scheduleMetricsFetch() {
-            updateMetrics();
-            setTimeout(scheduleMetricsFetch, METRICS_FETCH_INTERVAL);
         }
 
         async function init() {
@@ -371,9 +337,21 @@
                 await loadChannelInfo();
                 initCharts();
                 await updateMetrics();
-                scheduleMetricsFetch(); // Replace setInterval with our scheduling function
+
+                
+                // Start keepalive
+        await startKeepalive();
+        keepaliveInterval = setInterval(startKeepalive, 30000);
+
+
+                setInterval(updateMetrics, 1000);
+
+      
+                
+                // Add media info fetch to the initialization
                 fetchMediaInfo();
-                setInterval(fetchMediaInfo, 30000);
+
+                setInterval(fetchMediaInfo, 60000);
             } catch (error) {
                 console.error('Initialization error:', error);
             }
@@ -384,6 +362,16 @@
         } else {
             init();
         }
+
+
+       // Add cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    if (keepaliveInterval) {
+        clearInterval(keepaliveInterval);
+    }
+});
+
+
     </script>
 </head>
 <body class="bg-gray-100">
@@ -439,7 +427,12 @@
             
             <!-- Video Player Column -->
             <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-semibold mb-4">Live Preview</h2>
+                <button onclick="restartFFmpeg()" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded">
+                        Reload Player
+                    </button>
+                 </div>
                 <div id="playerContainer" class="aspect-video bg-gray-100 rounded">
                     <video id="video" controls class="w-full h-full"></video>
                 </div>
