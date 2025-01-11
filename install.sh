@@ -77,7 +77,7 @@ install_python_deps() {
         python3-uvicorn \
         python3-aiofiles
     # Note: GPUtil might not be available via apt, you may still need pip for that one
-    pip install GPUtil --break-system-packages
+    pip install GPUtil
 }
 
 # Clone repository
