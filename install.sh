@@ -63,11 +63,15 @@ build_librist() {
     cd /tmp
 }
 
-# Install Python dependencies
 install_python_deps() {
     echo "Installing Python dependencies..."
     apt-get update
-    apt-get install -y \
+    
+    # First ensure pip is installed
+    apt-get install -y python3-pip
+
+    # Try installing with apt-get first
+    if ! apt-get install -y \
         python3-fastapi \
         python3-flask \
         python3-flask-cors \
@@ -75,9 +79,17 @@ install_python_deps() {
         python3-pydantic \
         python3-yaml \
         python3-uvicorn \
-        python3-aiofiles
-    # Note: GPUtil might not be available via apt, you may still need pip for that one
-    pip install GPUtil
+        python3-aiofiles; then
+        
+        echo "Some packages weren't available via apt. Installing missing packages via pip..."
+        
+        # Install packages that might have failed via pip
+        pip3 install fastapi
+        pip3 install "uvicorn[standard]"
+    fi
+
+    # Install GPUtil via pip as it's not available in apt
+    pip3 install GPUtil
 }
 
 # Clone repository
