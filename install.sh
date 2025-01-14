@@ -123,6 +123,14 @@ stop_services() {
     else
         echo "No rist-api service found"
     fi
+
+    # Stop failover service if it exists
+    if systemctl list-unit-files | grep -q "rist-failover"; then
+        echo "Stopping rist-failover service"
+        systemctl stop rist-failover || echo "rist-failover service was not running"
+    else
+        echo "No rist-failover service found"
+    fi
     
     # Kill any remaining ffmpeg processes (pkill with || true already handles non-existent processes)
     echo "Checking for ffmpeg processes..."
@@ -221,14 +229,15 @@ verify_config() {
 
 # Set up API service
 setup_service() {
-    echo "Setting up systemd service..."
+    echo "Setting up systemd services..."
     
     echo "Creating log directory..."
     mkdir -p /var/log/ristreceiver
     chmod 755 /var/log/ristreceiver
     
-    echo "Installing service file..."
+    echo "Installing service files..."
     cp /root/rist/services/rist-api.service /etc/systemd/system/
+    cp /root/rist/services/rist-failover.service /etc/systemd/system/
     
     # Update service file to use correct path
     echo "Updating service paths..."
@@ -237,6 +246,7 @@ setup_service() {
     echo "Reloading systemd..."
     systemctl daemon-reload
     systemctl enable rist-api.service
+    systemctl enable rist-failover.service
 }
 
 # Start services
@@ -252,6 +262,9 @@ start_services() {
         systemctl start rist-api
         echo "Checking service status..."
         systemctl status rist-api --no-pager
+        systemctl start rist-failover
+        echo "Checking service status..."
+        systemctl status rist-failover --no-pager
     else
         echo "ERROR: Config file not found, cannot start rist-api!"
         exit 1
