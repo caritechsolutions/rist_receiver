@@ -3,88 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RIST Server Health Dashboard</title>
+    <title>System Performance Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.4;
-            background: #f4f4f4;
-            padding: 20px;
-            font-size: 14px;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #eee;
-        }
-
-        h1 {
-            color: #333;
-            font-size: 1.5em;
-        }
-
-        .back-button {
-            background: #6c757d;
-            color: white;
-            padding: 6px 12px;
-            text-decoration: none;
-            border-radius: 4px;
-            font-size: 0.9em;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .stat-card {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #dee2e6;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .stat-title {
-            font-size: 0.8em;
-            color: #666;
-            margin-bottom: 5px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .stat-value {
-            font-size: 1.4em;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 5px;
-            word-break: break-word;
-        }
-
         .progress-bar {
             width: 100%;
             height: 6px;
@@ -99,163 +21,85 @@
             border-radius: 4px;
             transition: width 0.3s ease;
         }
-
-        .chart-container {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #dee2e6;
-            margin-bottom: 20px;
-            height: 300px;
-        }
-
-        .chart-container2 {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #dee2e6;
-            margin-bottom: 20px;
-            
-        }
-
-
-        .chart-title {
-            font-size: 1em;
-            color: #333;
-            margin-bottom: 10px;
-        }
-
-        .network-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .network-card {
-            background: #f8f9fa;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #dee2e6;
-        }
-
-        .network-title {
-            font-weight: bold;
-            margin-bottom: 8px;
-            color: #333;
-            font-size: 0.9em;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .network-stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
-
-        .network-stat {
-            background: white;
-            padding: 8px;
-            border-radius: 4px;
-        }
-
-        .network-stat-label {
-            font-size: 0.7em;
-            color: #666;
-        }
-
-        .network-stat-value {
-            font-size: 0.9em;
-            font-weight: bold;
-            color: #333;
-        }
-
-        .error {
-            padding: 20px;
-            background: #fff3cd;
-            color: #856404;
-            border-radius: 4px;
-            margin-bottom: 20px;
-        }
     </style>
 </head>
-<body>
-    <div class="container">
-        <header>
-            <h1>Server Health Dashboard</h1>
-            <a href="index.html" class="back-button">Back to Channels</a>
-        </header>
-
-        <!-- Summary Stats -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-title">CPU Usage</div>
-                <div class="stat-value" id="cpuUsage">-</div>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold">System Performance Dashboard</h1>
+            <a href="/" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
+                Back to Channels
+            </a>
+        </div>
+        
+        <!-- Summary Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="text-sm text-gray-600">CPU Usage</h3>
+                <p id="cpuUsage" class="text-2xl font-bold">-%</p>
                 <div class="progress-bar">
-                    <div class="progress-value" id="cpuBar" style="background: #0d6efd;"></div>
+                    <div id="cpuBar" class="progress-value bg-blue-500"></div>
                 </div>
             </div>
 
-            <div class="stat-card">
-                <div class="stat-title">Memory Usage</div>
-                <div class="stat-value" id="memoryUsage">-</div>
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="text-sm text-gray-600">Memory Usage</h3>
+                <p id="memoryUsage" class="text-2xl font-bold">-%</p>
                 <div class="progress-bar">
-                    <div class="progress-value" id="memoryBar" style="background: #198754;"></div>
+                    <div id="memoryBar" class="progress-value bg-green-500"></div>
                 </div>
             </div>
 
-            <div class="stat-card">
-                <div class="stat-title">Disk Usage</div>
-                <div class="stat-value" id="diskUsage">-</div>
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="text-sm text-gray-600">Disk Usage</h3>
+                <p id="diskUsage" class="text-2xl font-bold">-%</p>
                 <div class="progress-bar">
-                    <div class="progress-value" id="diskBar" style="background: #6f42c1;"></div>
+                    <div id="diskBar" class="progress-value bg-purple-500"></div>
                 </div>
             </div>
 
-            <div class="stat-card">
-                <div class="stat-title">CPU Temperature</div>
-                <div class="stat-value" id="cpuTemp">-</div>
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="text-sm text-gray-600">CPU Temperature</h3>
+                <p id="cpuTemp" class="text-2xl font-bold">-°C</p>
                 <div class="progress-bar">
-                    <div class="progress-value" id="tempBar" style="background: #dc3545;"></div>
+                    <div id="tempBar" class="progress-value bg-red-500"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- CPU Usage Chart -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">CPU Usage</h2>
+                <div class="h-64">
+                    <canvas id="cpuChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Network Bandwidth Chart -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Network Bandwidth</h2>
+                <div class="h-64">
+                    <canvas id="bandwidthChart"></canvas>
                 </div>
             </div>
         </div>
 
-        <!-- CPU Per Core Chart -->
-        <div class="chart-container">
-            <div class="chart-title">CPU Usage Per Core</div>
-            <canvas id="cpuChart"></canvas>
-        </div>
-
-
-        <!-- Historical Usage Chart -->
-        <div class="chart-container">
-            <div class="chart-title">Historical Usage</div>
-            <canvas id="historyChart"></canvas>
-        </div>
-
-        <!-- Network Interfaces -->
-        <div class="chart-container2">
-            <div class="chart-title">Network Interfaces</div>
-            <div class="network-grid" id="networkGrid">
+        <!-- Network Interfaces Section -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">Network Interfaces</h2>
+            <div id="networkInterfaces" class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <!-- Network interface cards will be added here dynamically -->
             </div>
         </div>
-
-        
     </div>
 
     <script>
-        // Dynamic API base URL
         const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
-        
-        let cpuChart = null;
-        let historyChart = null;
-        const maxDataPoints = 20;
-        const historicalData = [];
-        const timeLabels = [];
+        const MAX_DATA_POINTS = 50;
+
+        // Bandwidth tracking
+        const networkHistory = {};
 
         function formatBytes(bytes) {
             if (bytes === 0) return '0 B';
@@ -266,10 +110,148 @@
         }
 
         function formatBytesPerSecond(bytes) {
-            // Ensure bytes is a number and not NaN
-            const safeBytes = isNaN(bytes) ? 0 : Math.max(0, bytes);
-            return formatBytes(safeBytes) + '/s';
+            if (bytes === 0) return '0 B/s';
+            const k = 1024;
+            const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s', 'TB/s'];
+            const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
+
+        function formatBits(bits, decimals = 2) {
+            const k = 1000;
+            const sizes = ['bps', 'Kbps', 'Mbps', 'Gbps', 'Tbps'];
+            if (bits === 0) return '0 bps';
+            
+            const i = Math.floor(Math.log(bits) / Math.log(k));
+            return parseFloat((bits / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
+        }
+
+function calculateNetworkBandwidth(currentStats) {
+    const now = Date.now() / 1000;  // Current time in seconds
+    const bandwidthStats = {};
+
+    Object.entries(currentStats).forEach(([interface, stats]) => {
+        // Initialize history for this interface if not exists
+        if (!networkHistory[interface]) {
+            networkHistory[interface] = {
+                lastTimestamp: now,
+                lastBytesSent: stats.bytes_sent,
+                lastBytesRecv: stats.bytes_recv,
+                sentBps: 0,
+                recvBps: 0
+            };
+        }
+
+        const history = networkHistory[interface];
+        const timeDiff = now - history.lastTimestamp;
+        
+        // Calculate bandwidth
+        const sentDiff = stats.bytes_sent - history.lastBytesSent;
+        const recvDiff = stats.bytes_recv - history.lastBytesRecv;
+
+        // Convert to bits per second
+        const sentBps = timeDiff > 0 ? (sentDiff * 8) / timeDiff : 0;
+        const recvBps = timeDiff > 0 ? (recvDiff * 8) / timeDiff : 0;
+
+        // Update history
+        history.lastTimestamp = now;
+        history.lastBytesSent = stats.bytes_sent;
+        history.lastBytesRecv = stats.bytes_recv;
+        history.sentBps = sentBps;
+        history.recvBps = recvBps;
+
+        bandwidthStats[interface] = {
+            sent: sentBps,
+            recv: recvBps,
+            total_sent: stats.bytes_sent,
+            total_recv: stats.bytes_recv
+        };
+    });
+
+    return bandwidthStats;
+}
+
+
+        // Chart initialization
+        const cpuCtx = document.getElementById('cpuChart').getContext('2d');
+        const bandwidthCtx = document.getElementById('bandwidthChart').getContext('2d');
+
+        const cpuChart = new Chart(cpuCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'CPU Usage %',
+                    data: [],
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Usage (%)'
+                        }
+                    }
+                }
+            }
+        });
+
+        const bandwidthChart = new Chart(bandwidthCtx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: []
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+            mode: 'nearest',
+            intersect: false
+        },
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    title: function(context) {
+                        return context[0].label;
+                    },
+                    label: function(context) {
+                        const interfaceName = context.dataset.label;
+                        const value = context.parsed.y;
+                        return `${interfaceName}: ${formatBits(value)}`;
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                title: {
+                    display: true,
+                    text: 'Bandwidth (bps)'
+                },
+                ticks: {
+                    callback: function(value) {
+                        return formatBits(value);
+                    }
+                }
+            },
+            x: {
+                title: {
+                    display: true,
+                    text: 'Time'
+                }
+            }
+        }
+    }
+});
 
         function updateSummaryStats(data) {
             // CPU Usage
@@ -290,163 +272,145 @@
 
             // CPU Temperature
             const temp = data.temperature;
-            //document.getElementById('cpuTemp').textContent = `${temp}&deg;C`;
             document.getElementById('cpuTemp').innerHTML = `${temp}&deg;C`;
             document.getElementById('tempBar').style.width = `${Math.min((temp / 100) * 100, 100)}%`;
             document.getElementById('tempBar').style.background = 
                 temp > 80 ? '#dc3545' : temp > 60 ? '#ffc107' : '#198754';
         }
 
-        function updateCPUChart(data) {
-            const ctx = document.getElementById('cpuChart');
-            
-            // Destroy existing chart if it exists
-            if (cpuChart) {
-                cpuChart.destroy();
-            }
+        function updateNetworkInterfaces(networkData) {
+            const interfacesContainer = document.getElementById('networkInterfaces');
+            interfacesContainer.innerHTML = '';
 
-            cpuChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: data.cpu.cores.map(c => `Core ${c.core}`),
-                    datasets: [{
-                        label: 'Usage %',
-                        data: data.cpu.cores.map(c => c.usage),
-                        backgroundColor: '#0d6efd'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            min: 0,
-                            max: 100,
-                            ticks: {
-                                precision: 0,
-                                callback: function(value) {
-                                    return value + '%';
-                                }
-                            }
-                        }
-                    },
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.dataset.label + ': ' + context.parsed.y + '%';
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        function updateHistoryChart(data) {
-            const now = new Date().toLocaleTimeString();
-            timeLabels.push(now);
-            historicalData.push({
-                cpu: data.cpu.average,
-                memory: data.memory.used_percent
-            });
-
-            if (timeLabels.length > maxDataPoints) {
-                timeLabels.shift();
-                historicalData.shift();
-            }
-
-            const ctx = document.getElementById('historyChart');
-            
-            // Destroy existing chart if it exists
-            if (historyChart) {
-                historyChart.destroy();
-            }
-
-            historyChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: timeLabels,
-                    datasets: [{
-                        label: 'CPU %',
-                        data: historicalData.map(d => d.cpu),
-                        borderColor: '#0d6efd',
-                        tension: 0.1
-                    }, {
-                        label: 'Memory %',
-                        data: historicalData.map(d => d.memory),
-                        borderColor: '#198754',
-                        tension: 0.1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            min: 0,
-                            max: 100,
-                            ticks: {
-                                precision: 0,
-                                callback: function(value) {
-                                    return value + '%';
-                                }
-                            }
-                        }
-                    },
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(1) + '%';
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        function updateNetworkStats(data) {
-            const networkGrid = document.getElementById('networkGrid');
-            networkGrid.innerHTML = '';
-
-            Object.entries(data.network).forEach(([interface_name, stats]) => {
-                const card = document.createElement('div');
-                card.className = 'network-card';
-                card.innerHTML = `
-                    <div class="network-title">${interface_name}</div>
-                    <div class="network-stats">
-                        <div class="network-stat">
-                            <div class="network-stat-label">Received</div>
-                            <div class="network-stat-value">${formatBytesPerSecond(stats.bytes_recv)}</div>
+            Object.entries(networkData).forEach(([interfaceName, stats]) => {
+                const interfaceCard = document.createElement('div');
+                interfaceCard.className = 'bg-gray-50 p-4 rounded-lg';
+                interfaceCard.innerHTML = `
+                    <div class="font-medium mb-2">${interfaceName}</div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-white p-3 rounded">
+                            <div class="text-xs text-gray-500">Received</div>
+                            <div class="font-medium">${formatBytesPerSecond(stats.recv)}</div>
+                            <div class="text-xs text-gray-500">Total: ${formatBytes(stats.total_recv)}</div>
                         </div>
-                        <div class="network-stat">
-                            <div class="network-stat-label">Sent</div>
-                            <div class="network-stat-value">${formatBytesPerSecond(stats.bytes_sent)}</div>
+                        <div class="bg-white p-3 rounded">
+                            <div class="text-xs text-gray-500">Sent</div>
+                            <div class="font-medium">${formatBytesPerSecond(stats.sent)}</div>
+                            <div class="text-xs text-gray-500">Total: ${formatBytes(stats.total_sent)}</div>
                         </div>
                     </div>
                 `;
-                networkGrid.appendChild(card);
+                interfacesContainer.appendChild(interfaceCard);
             });
         }
 
-        async function updateMetrics() {
-            try {
-                const response = await fetch(`${API_BASE}/health/metrics`);
-                if (!response.ok) throw new Error('Failed to fetch metrics');
-                const data = await response.json();
+async function updateMetrics() {
+    try {
+        const response = await fetch(`${API_BASE}/health/metrics`);
+        const data = await response.json();
 
-                updateSummaryStats(data);
-                updateCPUChart(data);
-                updateNetworkStats(data);
-                updateHistoryChart(data);
-            } catch (error) {
-                console.error('Error fetching metrics:', error);
-            }
+// Update Summary Stats
+        updateSummaryStats(data);
+
+        // Update Network Interfaces
+        // updateNetworkInterfaces(calculateNetworkBandwidth(data.network));
+
+        // Update CPU Chart
+        const newnow = new Date().toLocaleTimeString();
+        cpuChart.data.labels.push(newnow);
+        cpuChart.data.datasets[0].data.push(data.cpu.average);
+
+        // Trim CPU data to MAX_DATA_POINTS
+        if (cpuChart.data.labels.length > MAX_DATA_POINTS) {
+            cpuChart.data.labels.shift();
+            cpuChart.data.datasets[0].data.shift();
         }
+        cpuChart.update('none');
 
-        // Initial load and polling!
+        // Calculate Network Bandwidth
+        const networkBandwidth = calculateNetworkBandwidth(data.network);
+
+        // Update Network Interfaces
+        updateNetworkInterfaces(networkBandwidth);
+
+        // Prepare bandwidth datasets for chart
+        const now = new Date().toLocaleTimeString();
+        const bandwidthDatasets = [];
+
+        Object.entries(networkBandwidth).forEach(([interface, stats]) => {
+            // Prepare Sent bandwidth dataset
+            let sentDataset = bandwidthChart.data.datasets.find(
+                dataset => dataset.label === `${interface} Sent`
+            );
+            
+            if (!sentDataset) {
+                sentDataset = {
+                    label: `${interface} Sent`,
+                    data: [],
+                    borderColor: `hsl(${Math.random() * 360}, 70%, 50%)`,
+                    tension: 0.1
+                };
+            }
+            
+            // Add current bandwidth to dataset
+            const sentData = sentDataset.data;
+            sentData.push(stats.sent);
+            
+            // Trim data if needed
+            if (sentData.length > MAX_DATA_POINTS) {
+                sentData.shift();
+            }
+            
+            bandwidthDatasets.push({
+                ...sentDataset,
+                data: sentData
+            });
+
+            // Prepare Received bandwidth dataset
+            let recvDataset = bandwidthChart.data.datasets.find(
+                dataset => dataset.label === `${interface} Received`
+            );
+            
+            if (!recvDataset) {
+                recvDataset = {
+                    label: `${interface} Received`,
+                    data: [],
+                    borderColor: `hsl(${Math.random() * 360}, 70%, 50%)`,
+                    tension: 0.1
+                };
+            }
+            
+            // Add current bandwidth to dataset
+            const recvData = recvDataset.data;
+            recvData.push(stats.recv);
+            
+            // Trim data if needed
+            if (recvData.length > MAX_DATA_POINTS) {
+                recvData.shift();
+            }
+            
+            bandwidthDatasets.push({
+                ...recvDataset,
+                data: recvData
+            });
+        });
+
+        // Update chart labels
+        if (bandwidthChart.data.labels.length > MAX_DATA_POINTS) {
+            bandwidthChart.data.labels.shift();
+        }
+        bandwidthChart.data.labels.push(now);
+
+        // Update chart datasets
+        bandwidthChart.data.datasets = bandwidthDatasets;
+        bandwidthChart.update('none');
+
+    } catch (error) {
+        console.error('Error fetching metrics:', error);
+    }
+}
+
+        // Initial update and polling
         updateMetrics();
         setInterval(updateMetrics, 5000);
     </script>
