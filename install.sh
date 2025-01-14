@@ -89,7 +89,7 @@ install_python_deps() {
     fi
 
     # Install GPUtil via pip as it's not available in apt
-    pip3 install GPUtil
+    pip3 install GPUtil --break-system-packages
 }
 
 # Clone repository
