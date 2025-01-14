@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import yaml
@@ -796,6 +796,115 @@ def health_check():
         "channels": len(config["channels"])
     }
 
+@app.get("/channels/{channel_id}/backup-health")
+def get_channel_backup_health(channel_id: str):
+    """
+    Check backup health status for a channel
+    """
+    try:
+        # Look for a health status file created by the failover script
+        health_status_file = f"/root/rist/{channel_id}_backup_health.json"
+        
+        if os.path.exists(health_status_file):
+            with open(health_status_file, 'r') as f:
+                health_data = json.load(f)
+            
+            return {
+                "channel_id": channel_id,
+                "has_backups": health_data.get('has_backups', False),
+                "is_healthy": health_data.get('is_healthy', False),
+                "last_checked": health_data.get('last_checked', None)
+            }
+        else:
+            # If no health status file exists, assume no backups
+            return {
+                "channel_id": channel_id,
+                "has_backups": False,
+                "is_healthy": False,
+                "last_checked": None
+            }
+    
+    except Exception as e:
+        logger.error(f"Failed to retrieve backup health for {channel_id}: {e}")
+        return {
+            "channel_id": channel_id,
+            "has_backups": False,
+            "is_healthy": False,
+            "last_checked": None
+        }
+
+@app.get("/channels/{channel_id}/backup-sources")
+def get_channel_backup_sources(channel_id: str):
+    """
+    Retrieve backup sources for a specific channel
+    """
+    try:
+        # Load backup sources configuration
+        backup_config_path = "/root/rist/backup_sources.yaml"
+        
+        if not os.path.exists(backup_config_path):
+            return {"channel_id": channel_id, "backup_sources": []}
+        
+        with open(backup_config_path, 'r') as f:
+            backup_config = yaml.safe_load(f) or {}
+        
+        # Get backup sources for the channel
+        backup_sources = backup_config.get('channels', {}).get(channel_id, [])
+        
+        return {
+            "channel_id": channel_id,
+            "backup_sources": backup_sources
+        }
+    except Exception as e:
+        logger.error(f"Failed to retrieve backup sources for {channel_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve backup sources")
+
+@app.put("/channels/{channel_id}/backup-sources")
+def update_channel_backup_sources(
+    channel_id: str, 
+    backup_sources: List[str] = Body(...)
+):
+    """
+    Update backup sources for a specific channel
+    """
+    try:
+        backup_config_path = "/root/rist/backup_sources.yaml"
+        
+        # Load existing backup sources configuration
+        try:
+            with open(backup_config_path, 'r') as f:
+                backup_config = yaml.safe_load(f) or {}
+        except FileNotFoundError:
+            backup_config = {}
+        
+        # Ensure channels key exists
+        if 'channels' not in backup_config:
+            backup_config['channels'] = {}
+        
+        # Remove empty strings and duplicates
+        clean_sources = list(dict.fromkeys(
+            [source.strip() for source in backup_sources if source.strip()]
+        ))
+        
+        # Update backup sources for the channel
+        if clean_sources:
+            backup_config['channels'][channel_id] = clean_sources
+        elif channel_id in backup_config['channels']:
+            # Remove channel if no backup sources
+            del backup_config['channels'][channel_id]
+        
+        # Save updated configuration
+        with open(backup_config_path, 'w') as f:
+            yaml.safe_dump(backup_config, f)
+        
+        return {
+            "channel_id": channel_id,
+            "backup_sources": clean_sources,
+            "message": "Backup sources updated successfully"
+        }
+    except Exception as e:
+        logger.error(f"Failed to update backup sources for {channel_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update backup sources")
 
 
 if __name__ == "__main__":
