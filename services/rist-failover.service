@@ -1,0 +1,17 @@
+[Unit]
+Description=RIST Receiver Failover Manager
+After=network.target rist-api.service
+Requires=rist-api.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/rist
+ExecStart=/usr/bin/python3 /root/rist/rist-failover.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/var/log/rist-failover.log
+StandardError=append:/var/log/rist-failover.log
+
+[Install]
+WantedBy=multi-user.target
