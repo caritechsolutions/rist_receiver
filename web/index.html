@@ -177,6 +177,37 @@
             padding: 20px;
             font-style: italic;
         }
+
+        .backup-indicator {
+        display: inline-flex;
+        align-items: center;
+        margin-right: 8px;
+    }
+
+    .backup-heart {
+        width: 20px;
+        height: 20px;
+        background-size: contain;
+        background-repeat: no-repeat;
+        margin-right: 4px;
+    }
+
+    .backup-heart.healthy {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2328a745'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E");
+    }
+
+    .backup-heart.unhealthy {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23868e96'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E");
+    }
+
+    .backup-status {
+        font-size: 0.7em;
+        font-weight: bold;
+        color: #666;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 2px 4px;
+    }
     </style>
 </head>
 <body>
@@ -205,191 +236,225 @@
     </div>
 
     <script>
-        // const API_BASE = 'http://192.168.12.170:5000';
-           const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
+// const API_BASE = 'http://192.168.12.170:5000';
+const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
 
-        function createChannelRow(channelId, channel) {
-            const statusClass = channel.status === 'running' ? 'active' : 
-                              channel.status === 'error' ? 'error' : 'inactive';
-            const statusText = channel.status === 'running' ? 'Running' : 
-                             channel.status === 'error' ? 'Error' : 'Stopped';
-            
-            return `
-                <tr data-channel-id="${channelId}">
-                    <td><a href="stats.html?channel=${channelId}" class="channel-link">${channel.name}</a></td>
-                    <td>${channel.input}</td>
-                    <td>${channel.output}</td>
-                    <td>
-                        <span class="status ${statusClass}">${statusText}</span>
-                        ${channel.last_error ? `<div class="error-message">${channel.last_error}</div>` : ''}
-                    </td>
-                    <td><span class="metrics-port">${channel.metrics_port}</span></td>
-                    <td class="actions">
-                        <button class="btn ${channel.status === 'running' ? 'btn-stop' : 'btn-start'}" 
-                                onclick="channelManager.handleToggleChannel('${channelId}')"
-                                ${channel.status === 'processing' ? 'disabled' : ''}>
-                            ${channel.status === 'running' ? 'Stop' : 'Start'}
-                        </button>
-                        <a href="edit.html?channel=${channelId}" class="btn btn-edit">Edit</a>
-                        <button class="btn btn-delete" 
-                                onclick="channelManager.handleDeleteChannel('${channelId}')">Delete</button>
+function createChannelRow(channelId, channel, backupHealth) {
+    const statusClass = channel.status === 'running' ? 'active' : 
+                      channel.status === 'error' ? 'error' : 'inactive';
+    const statusText = channel.status === 'running' ? 'Running' : 
+                     channel.status === 'error' ? 'Error' : 'Stopped';
+    
+    // Backup health indicator
+    const hasBackups = backupHealth && backupHealth.has_backups;
+    const isHealthy = backupHealth && backupHealth.is_healthy;
+    const backupIndicator = `
+    <div class="backup-indicator">
+        <div class="backup-heart ${isHealthy ? 'healthy' : 'unhealthy'}"></div>
+        <span class="backup-status">${hasBackups ? 'HA' : 'SA'}</span>
+    </div>
+`;
+    
+    return `
+        <tr data-channel-id="${channelId}">
+            <td>
+                ${backupIndicator}
+                <a href="stats.html?channel=${channelId}" class="channel-link">${channel.name}</a>
+            </td>
+            <td>${channel.input}</td>
+            <td>${channel.output}</td>
+            <td>
+                <span class="status ${statusClass}">${statusText}</span>
+                ${channel.last_error ? `<div class="error-message">${channel.last_error}</div>` : ''}
+            </td>
+            <td><span class="metrics-port">${channel.metrics_port}</span></td>
+            <td class="actions">
+                <button class="btn ${channel.status === 'running' ? 'btn-stop' : 'btn-start'}" 
+                        onclick="channelManager.handleToggleChannel('${channelId}')"
+                        ${channel.status === 'processing' ? 'disabled' : ''}>
+                    ${channel.status === 'running' ? 'Stop' : 'Start'}
+                </button>
+                <a href="edit.html?channel=${channelId}" class="btn btn-edit">Edit</a>
+                <button class="btn btn-delete" 
+                        onclick="channelManager.handleDeleteChannel('${channelId}')">Delete</button>
+            </td>
+        </tr>
+    `;
+}
+
+class ChannelManager {
+    constructor() {
+        this.channels = {};
+        this.backupHealth = {};
+        this.pollingInterval = null;
+        this.isPolling = false;
+    }
+
+    async fetchBackupHealth(channelId) {
+        try {
+            const response = await fetch(`${API_BASE}/channels/${channelId}/backup-health`, {
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
+            const data = await response.json();
+            this.backupHealth[channelId] = data;
+            return data;
+        } catch (error) {
+            console.error(`Error fetching backup health for ${channelId}:`, error);
+            this.backupHealth[channelId] = { 
+                channel_id: channelId, 
+                has_backups: false, 
+                is_healthy: false 
+            };
+            return this.backupHealth[channelId];
+        }
+    }
+
+    async loadChannels(forceRefresh = false) {
+    if (this.isPolling) return;
+
+    try {
+        this.isPolling = true;
+        const response = await fetch(`${API_BASE}/channels`, {
+            cache: 'no-store',
+            headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            }
+        });
+        const channels = await response.json();
+        
+        const tbody = document.querySelector('.channel-list tbody');
+        
+        if (Object.keys(channels).length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="no-channels">
+                        No channels configured. Click "Add Channel" to create one.
                     </td>
                 </tr>
             `;
+            return;
         }
 
-        class ChannelManager {
-            constructor() {
-                this.channels = {};
-                this.pollingInterval = null;
-                this.isPolling = false;
-            }
+        // Fetch backup health for all channels
+        const healthPromises = Object.keys(channels).map(
+            channelId => this.fetchBackupHealth(channelId)
+        );
+        await Promise.all(healthPromises);
 
-            async loadChannels(forceRefresh = false) {
-                if (this.isPolling) return;
-
-                try {
-                    this.isPolling = true;
-                    const response = await fetch(`${API_BASE}/channels`, {
-                        cache: 'no-store',
-                        headers: {
-                            'Cache-Control': 'no-cache',
-                            'Pragma': 'no-cache'
-                        }
-                    });
-                    const channels = await response.json();
-                    
-                    const tbody = document.querySelector('.channel-list tbody');
-                    
-                    if (Object.keys(channels).length === 0) {
-                        tbody.innerHTML = `
-                            <tr>
-                                <td colspan="6" class="no-channels">
-                                    No channels configured. Click "Add Channel" to create one.
-                                </td>
-                            </tr>
-                        `;
-                        return;
-                    }
-
-                    if (forceRefresh) {
-                        tbody.innerHTML = '';
-                        Object.entries(channels).forEach(([channelId, channel]) => {
-                            this.channels[channelId] = channel;
-                            tbody.insertAdjacentHTML('beforeend', createChannelRow(channelId, channel));
-                        });
-                    } else {
-                        // Update only changed rows
-                        Object.entries(channels).forEach(([channelId, channel]) => {
-                            const existingRow = tbody.querySelector(`tr[data-channel-id="${channelId}"]`);
-                            if (!existingRow || JSON.stringify(this.channels[channelId]) !== JSON.stringify(channel)) {
-                                if (existingRow) {
-                                    existingRow.outerHTML = createChannelRow(channelId, channel);
-                                } else {
-                                    tbody.insertAdjacentHTML('beforeend', createChannelRow(channelId, channel));
-                                }
-                                this.channels[channelId] = channel;
-                            }
-                        });
-                    }
-
-                } catch (error) {
-                    console.error('Error loading channels:', error);
-                } finally {
-                    this.isPolling = false;
-                }
-            }
-
-            async handleDeleteChannel(channelId) {
-                if (!confirm('Are you sure you want to delete this channel?')) return;
-                
-                try {
-                    const response = await fetch(`${API_BASE}/channels/${channelId}`, {
-                        method: 'DELETE',
-                        cache: 'no-store',
-                        headers: {
-                            'Cache-Control': 'no-cache',
-                            'Pragma': 'no-cache'
-                        }
-                    });
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || 'Failed to delete channel');
-                    }
-                    
-                    await this.loadChannels(true);
-                } catch (error) {
-                    console.error('Error deleting channel:', error);
-                    alert(`Error deleting channel: ${error.message}`);
-                }
-            }
-
-            async handleToggleChannel(channelId) {
-                const channel = this.channels[channelId];
-                const isStarting = channel.status !== 'running';
-                const button = document.querySelector(`tr[data-channel-id="${channelId}"] .btn-${isStarting ? 'start' : 'stop'}`);
-                
-                if (button.disabled) return;
-                
-                button.disabled = true;
-                button.textContent = isStarting ? 'Starting...' : 'Stopping...';
-                
-                try {
-                    const response = await fetch(
-                        `${API_BASE}/channels/${channelId}/${isStarting ? 'start' : 'stop'}`,
-                        { 
-                            method: 'PUT',
-                            cache: 'no-store',
-                            headers: {
-                                'Cache-Control': 'no-cache',
-                                'Pragma': 'no-cache'
-                            }
-                        }
-                    );
-
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || `Failed to ${isStarting ? 'start' : 'stop'} channel`);
-                    }
-
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    await this.loadChannels(true);
-                    
-                } catch (error) {
-                    console.error('Error updating channel status:', error);
-                    alert(`Error ${isStarting ? 'starting' : 'stopping'} channel: ${error.message}`);
-                    button.disabled = false;
-                    button.textContent = isStarting ? 'Start' : 'Stop';
-                }
-            }
-
-            startPolling(interval = 5000) {
-                if (this.pollingInterval) {
-                    clearInterval(this.pollingInterval);
-                }
-                
-                this.pollingInterval = setInterval(() => this.loadChannels(), interval);
-            }
-
-            stopPolling() {
-                if (this.pollingInterval) {
-                    clearInterval(this.pollingInterval);
-                    this.pollingInterval = null;
-                }
-            }
-        }
-
-        const channelManager = new ChannelManager();
-
-        document.addEventListener('DOMContentLoaded', () => {
-            channelManager.loadChannels(true);
-            channelManager.startPolling();
-
-            window.addEventListener('unload', () => {
-                channelManager.stopPolling();
-            });
+        // Clear and rebuild entire tbody
+        tbody.innerHTML = '';
+        Object.entries(channels).forEach(([channelId, channel]) => {
+            this.channels[channelId] = channel;
+            tbody.insertAdjacentHTML('beforeend', 
+                createChannelRow(channelId, channel, this.backupHealth[channelId])
+            );
         });
+
+    } catch (error) {
+        console.error('Error loading channels:', error);
+    } finally {
+        this.isPolling = false;
+    }
+}
+
+
+    async handleDeleteChannel(channelId) {
+        if (!confirm('Are you sure you want to delete this channel?')) return;
+        
+        try {
+            const response = await fetch(`${API_BASE}/channels/${channelId}`, {
+                method: 'DELETE',
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to delete channel');
+            }
+            
+            await this.loadChannels(true);
+        } catch (error) {
+            console.error('Error deleting channel:', error);
+            alert(`Error deleting channel: ${error.message}`);
+        }
+    }
+
+    async handleToggleChannel(channelId) {
+        const channel = this.channels[channelId];
+        const isStarting = channel.status !== 'running';
+        const button = document.querySelector(`tr[data-channel-id="${channelId}"] .btn-${isStarting ? 'start' : 'stop'}`);
+        
+        if (button.disabled) return;
+        
+        button.disabled = true;
+        button.textContent = isStarting ? 'Starting...' : 'Stopping...';
+        
+        try {
+            const response = await fetch(
+                `${API_BASE}/channels/${channelId}/${isStarting ? 'start' : 'stop'}`,
+                { 
+                    method: 'PUT',
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `Failed to ${isStarting ? 'start' : 'stop'} channel`);
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            await this.loadChannels(true);
+            
+        } catch (error) {
+            console.error('Error updating channel status:', error);
+            alert(`Error ${isStarting ? 'starting' : 'stopping'} channel: ${error.message}`);
+            button.disabled = false;
+            button.textContent = isStarting ? 'Start' : 'Stop';
+        }
+    }
+
+    startPolling(interval = 5000) {
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+        }
+        
+        this.pollingInterval = setInterval(() => this.loadChannels(), interval);
+    }
+
+    stopPolling() {
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
+        }
+    }
+}
+
+const channelManager = new ChannelManager();
+
+document.addEventListener('DOMContentLoaded', () => {
+    channelManager.loadChannels(true);
+    channelManager.startPolling();
+
+    window.addEventListener('unload', () => {
+        channelManager.stopPolling();
+    });
+});        
+
+
     </script>
 </body>
 </html>
