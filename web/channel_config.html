@@ -8,7 +8,7 @@
 </head>
 <body class="bg-gray-100">
     <div class="container mx-auto px-4 py-8">
-        <div class="max-w-md mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
+        <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
             <div class="px-6 py-4">
                 <h2 class="text-2xl font-bold mb-4">Add New Channel</h2>
                 <form id="channelForm" class="space-y-4">
@@ -42,6 +42,15 @@
                         <input type="number" id="multicast_port" required min="1" max="65535" value="10000"
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                     </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Backup Sources (one per line, optional)</label>
+                        <textarea id="backup_sources" 
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            rows="4" placeholder="Enter backup source URLs, one per line"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">Example: rist://backup1.example.com:1234/stream</p>
+                    </div>
+                    
                     <div class="flex justify-end space-x-4">
                         <a href="/" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Cancel</a>
                         <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add Channel</button>
@@ -52,7 +61,7 @@
     </div>
 
     <script>
-       // const API_BASE = 'http://192.168.12.170:5000';
+        // const API_BASE = 'http://192.168.12.170:5000';
         const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
 
         async function getNextChannelId() {
@@ -123,7 +132,8 @@
                     last_error: null
                 };
 
-                const response = await fetch(`${API_BASE}/channels/${channelId}`, {
+                // Create channel first
+                const channelResponse = await fetch(`${API_BASE}/channels/${channelId}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -131,12 +141,35 @@
                     body: JSON.stringify(formData)
                 });
                 
-                if (response.ok) {
-                    window.location.href = '/';
-                } else {
-                    const errorData = await response.json();
-                    alert(`Error adding channel: ${errorData.detail || 'Unknown error'}`);
+                if (!channelResponse.ok) {
+                    const errorData = await channelResponse.json();
+                    throw new Error(errorData.detail || 'Failed to create channel');
                 }
+
+                // Process backup sources if provided
+                const backupSourcesText = document.getElementById('backup_sources').value.trim();
+                if (backupSourcesText) {
+                    const backupSources = backupSourcesText.split('\n')
+                        .map(source => source.trim())
+                        .filter(source => source !== '');
+
+                    if (backupSources.length > 0) {
+                        const backupResponse = await fetch(`${API_BASE}/channels/${channelId}/backup-sources`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(backupSources)
+                        });
+
+                        if (!backupResponse.ok) {
+                            const errorData = await backupResponse.json();
+                            throw new Error(errorData.detail || 'Failed to save backup sources');
+                        }
+                    }
+                }
+                
+                window.location.href = '/';
             } catch (error) {
                 console.error('Error:', error);
                 alert('Error adding channel: ' + error.message);
