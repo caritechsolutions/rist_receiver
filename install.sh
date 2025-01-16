@@ -69,7 +69,7 @@ install_python_deps() {
     
     # First ensure pip is installed
     apt-get install -y python3-pip
-
+    
     # Try installing with apt-get first
     if ! apt-get install -y \
         python3-fastapi \
@@ -87,9 +87,17 @@ install_python_deps() {
         pip3 install fastapi
         pip3 install "uvicorn[standard]"
     fi
-
-    # Install GPUtil via pip as it's not available in apt
-    pip3 install GPUtil --break-system-packages
+    
+    # Check pip version to determine if --break-system-packages is supported
+    PIP_VERSION=$(pip3 --version | awk '{print $2}')
+    PIP_MAJOR=$(echo $PIP_VERSION | cut -d. -f1)
+    PIP_MINOR=$(echo $PIP_VERSION | cut -d. -f2)
+    
+    if [ "$PIP_MAJOR" -gt 23 ] || ([ "$PIP_MAJOR" -eq 23 ] && [ "$PIP_MINOR" -ge 0 ]); then
+        pip3 install GPUtil --break-system-packages
+    else
+        pip3 install GPUtil
+    fi
 }
 
 # Clone repository
