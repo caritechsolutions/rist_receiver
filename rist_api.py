@@ -393,8 +393,7 @@ Type=simple
 ExecStart={' '.join(rist_cmd_parts)}
 Restart=always
 RestartSec=3
-StandardOutput=append:/var/log/ristreceiver/receiver_{channel_id}.log
-StandardError=append:/var/log/ristreceiver/receiver_{channel_id}.log
+
 
 [Install]
 WantedBy=multi-user.target
@@ -413,8 +412,7 @@ ExecStart=ffmpeg -i {channel['output']} -c copy -hls_time 5 -hls_list_size 5 -hl
 ExecStopPost=/bin/bash -c "rm -f {stream_path}/*.ts {stream_path}/*.m3u8"
 Restart=always
 RestartSec=3
-StandardOutput=append:/var/log/ristreceiver/ffmpeg_{channel_id}.log
-StandardError=append:/var/log/ristreceiver/ffmpeg_{channel_id}.log
+
 
 [Install]
 WantedBy=multi-user.target
