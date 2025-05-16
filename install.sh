@@ -257,6 +257,29 @@ setup_service() {
     systemctl enable rist-failover.service
 }
 
+# New function to install and configure WireGuard
+install_wireguard() {
+    echo "Installing WireGuard..."
+    apt-get install -y wireguard
+    
+    echo "Setting up WireGuard configuration..."
+    mkdir -p /etc/wireguard
+    
+    # Prompt user for WireGuard configuration
+    echo "Please paste your WireGuard configuration below."
+    echo "When finished, press Ctrl+D on a new line:"
+    cat > /etc/wireguard/wg0.conf
+    
+    # Set proper permissions
+    chmod 600 /etc/wireguard/wg0.conf
+    
+    # Enable and start WireGuard service
+    systemctl enable wg-quick@wg0
+    systemctl start wg-quick@wg0
+    
+    echo "WireGuard installation completed!"
+}
+
 # Start services
 start_services() {
     echo "Starting services..."
@@ -290,6 +313,7 @@ main() {
     setup_web
     setup_tmpfs
     setup_service
+    install_wireguard  # Added WireGuard installation
     start_services
     
     echo "Installation completed successfully!"
