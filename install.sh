@@ -265,21 +265,38 @@ install_wireguard() {
     echo "Setting up WireGuard configuration..."
     mkdir -p /etc/wireguard
     
-    # Prompt user for WireGuard configuration
-    echo "Please paste your WireGuard configuration below."
-    echo "When finished, press Ctrl+D on a new line:"
-    cat > /etc/wireguard/wg0.conf
+    # Create a template WireGuard configuration
+    cat > /etc/wireguard/wg0.conf << 'EOF'
+# WireGuard configuration template
+# Replace with your actual configuration
+[Interface]
+PrivateKey = YOUR_PRIVATE_KEY
+Address = YOUR_IP_ADDRESS/24
+ListenPort = 51820
 
-    nano /etc/wireguard/wg0.conf
+[Peer]
+PublicKey = PEER_PUBLIC_KEY
+AllowedIPs = 0.0.0.0/0
+Endpoint = PEER_ENDPOINT:51820
+EOF
     
     # Set proper permissions
     chmod 600 /etc/wireguard/wg0.conf
     
-    # Enable and start WireGuard service
-    systemctl enable wg-quick@wg0
-    systemctl start wg-quick@wg0
+    echo ""
+    echo "=========================================================="
+    echo "WireGuard has been installed with a template configuration."
+    echo "You need to edit the configuration file before using it:"
+    echo ""
+    echo "   sudo nano /etc/wireguard/wg0.conf"
+    echo ""
+    echo "After editing, enable and start WireGuard with:"
+    echo "   sudo systemctl enable wg-quick@wg0"
+    echo "   sudo systemctl start wg-quick@wg0"
+    echo "=========================================================="
+    echo ""
     
-    echo "WireGuard installation completed!"
+    # Not starting WireGuard service automatically since config needs editing
 }
 
 # Start services
@@ -320,6 +337,21 @@ main() {
     
     echo "Installation completed successfully!"
     echo "Please check service status with: systemctl status rist-api"
+    echo ""
+    echo "IMPORTANT: Don't forget to edit your WireGuard configuration"
+    echo "and start the service as mentioned in the instructions above."
+    echo ""
+    echo "=========================================================="
+    echo "WireGuard has been installed with a template configuration."
+    echo "You need to edit the configuration file before using it:"
+    echo ""
+    echo "   sudo nano /etc/wireguard/wg0.conf"
+    echo ""
+    echo "After editing, enable and start WireGuard with:"
+    echo "   sudo systemctl enable wg-quick@wg0"
+    echo "   sudo systemctl start wg-quick@wg0"
+    echo "=========================================================="
+    echo ""
 }
 
 # Run main installation
