@@ -269,6 +269,8 @@ install_wireguard() {
     echo "Please paste your WireGuard configuration below."
     echo "When finished, press Ctrl+D on a new line:"
     cat > /etc/wireguard/wg0.conf
+
+    nano /etc/wireguard/wg0.conf
     
     # Set proper permissions
     chmod 600 /etc/wireguard/wg0.conf
