@@ -257,6 +257,39 @@ setup_service() {
     systemctl enable rist-failover.service
 }
 
+# Configure logrotate for better log management
+setup_logrotate() {
+    echo "Configuring logrotate for system logs..."
+    
+    cat > /etc/logrotate.d/rsyslog << 'EOF'
+/var/log/syslog
+/var/log/mail.log
+/var/log/kern.log
+/var/log/auth.log
+/var/log/user.log
+/var/log/cron.log
+{
+        daily
+        rotate 1
+        size 50M
+        missingok
+        notifempty
+        compress
+        delaycompress
+        sharedscripts
+        su root syslog
+        postrotate
+                /usr/lib/rsyslog/rsyslog-rotate
+        endscript
+}
+EOF
+    
+    echo "Forcing initial log rotation..."
+    logrotate -f /etc/logrotate.d/rsyslog
+    
+    echo "Logrotate configuration completed."
+}
+
 # New function to install and configure WireGuard
 install_wireguard() {
     echo "Installing WireGuard..."
@@ -332,6 +365,7 @@ main() {
     setup_web
     setup_tmpfs
     setup_service
+    setup_logrotate  # Added logrotate configuration
     install_wireguard  # Added WireGuard installation
     start_services
     
