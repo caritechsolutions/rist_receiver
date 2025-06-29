@@ -365,7 +365,7 @@ def generate_service_file(channel_id: str, channel: Dict):
         f"-p {channel['settings']['profile']}",
         f"-i '{input_url}'",
         f"-o '{channel['output']}'",
-        "-v 6",
+        "-v 2",
         "-M",
         "--metrics-http",
         f"--metrics-port={channel['metrics_port']}",
