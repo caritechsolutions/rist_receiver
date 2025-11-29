@@ -613,17 +613,71 @@ WantedBy=multi-user.target
         
 
 
-def get_channel_status(channel_id: str) -> str:
-    """Get the status of a channel's systemd service"""
+def get_channel_status(channel_id: str) -> tuple:
+    """
+    Get the status of a channel's systemd service and any error message
+    Returns: (status, last_error)
+    """
     try:
+        # Check systemd service state
         result = subprocess.run(
             ["systemctl", "is-active", f"rist-channel-{channel_id}.service"],
             capture_output=True,
             text=True
         )
-        return "running" if result.stdout.strip() == "active" else "stopped"
-    except Exception:
-        return "error"
+        service_state = result.stdout.strip()
+        
+        if service_state == "failed":
+            # Get failure reason from systemd
+            reason_result = subprocess.run(
+                ["systemctl", "status", f"rist-channel-{channel_id}.service", "--no-pager", "-l"],
+                capture_output=True,
+                text=True
+            )
+            # Extract last few lines for error context
+            status_lines = reason_result.stdout.strip().split('\n')
+            error_msg = "Service failed"
+            for line in status_lines[-5:]:
+                if "error" in line.lower() or "failed" in line.lower():
+                    error_msg = line.strip()[:100]  # Limit length
+                    break
+            return ("error", error_msg)
+        
+        elif service_state == "active":
+            # Service is running, now check stream health
+            config = load_config()
+            if channel_id in config["channels"]:
+                channel = config["channels"][channel_id]
+                metrics_port = channel.get("metrics_port")
+                
+                if metrics_port:
+                    try:
+                        # Quick metrics check (short timeout)
+                        response = requests.get(
+                            f"http://localhost:{metrics_port}/metrics", 
+                            timeout=2
+                        )
+                        if response.status_code == 200:
+                            metrics = parse_prometheus_metrics(response.text)
+                            
+                            # Check for unhealthy stream
+                            if metrics.get("peers", 0) == 0:
+                                return ("error", "No peers connected")
+                            elif metrics.get("quality", 100) < 50:
+                                return ("error", f"Poor stream quality: {metrics.get('quality', 0):.0f}%")
+                    except requests.RequestException:
+                        # Can't reach metrics endpoint - might still be starting
+                        pass
+            
+            return ("running", None)
+        
+        else:
+            # inactive, deactivating, etc.
+            return ("stopped", None)
+            
+    except Exception as e:
+        logger.error(f"Error checking channel status for {channel_id}: {e}")
+        return ("error", str(e))
 
 def get_next_metrics_port(config):
     """Find the next available metrics port"""
@@ -1007,7 +1061,9 @@ def get_channels():
     """Retrieve all channels with their current status"""
     config = load_config()
     for channel_id in config["channels"]:
-        config["channels"][channel_id]["status"] = get_channel_status(channel_id)
+        status, last_error = get_channel_status(channel_id)
+        config["channels"][channel_id]["status"] = status
+        config["channels"][channel_id]["last_error"] = last_error
     return config["channels"]
 
 @app.get("/channels/next")
@@ -1036,7 +1092,9 @@ def get_channel(channel_id: str):
     if channel_id not in config["channels"]:
         raise HTTPException(status_code=404)
     channel = config["channels"][channel_id]
-    channel["status"] = get_channel_status(channel_id)
+    status, last_error = get_channel_status(channel_id)
+    channel["status"] = status
+    channel["last_error"] = last_error
     return channel
 
 @app.post("/channels/{channel_id}")
@@ -1071,7 +1129,8 @@ def update_channel(channel_id: str, channel: Channel):
     
     generate_service_file(channel_id, channel_dict)
     
-    if get_channel_status(channel_id) == "running":
+    status, _ = get_channel_status(channel_id)
+    if status == "running":
         try:
             subprocess.run(["systemctl", "restart", f"rist-channel-{channel_id}.service"], check=True)
             channel_keepalive(channel_id)  # This will start FFmpeg if needed
@@ -1485,7 +1544,8 @@ async def restore_config(backup_data: dict = Body(...)):
         # Step 1: Stop all running channels
         current_config = load_config()
         for channel_id in current_config.get("channels", {}):
-            if get_channel_status(channel_id) == "running":
+            status, _ = get_channel_status(channel_id)
+            if status == "running":
                 logger.info(f"Stopping channel {channel_id} for restore")
                 try:
                     subprocess.run(["systemctl", "stop", f"rist-channel-{channel_id}.service"], check=True)
@@ -1565,7 +1625,8 @@ async def revert_config():
         # Step 1: Stop all running channels
         current_config = load_config()
         for channel_id in current_config.get("channels", {}):
-            if get_channel_status(channel_id) == "running":
+            status, _ = get_channel_status(channel_id)
+            if status == "running":
                 logger.info(f"Stopping channel {channel_id} for revert")
                 try:
                     subprocess.run(["systemctl", "stop", f"rist-channel-{channel_id}.service"], check=True)
