@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>RIST Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #111820;
+            --bg-tertiary: #1a2332;
+            --bg-hover: #232d3f;
+            --border-color: #2a3a4d;
+            --border-highlight: #3d5a80;
+            --text-primary: #e8eef4;
+            --text-secondary: #8899a8;
+            --text-muted: #5a6a7a;
+            --accent-blue: #3b82f6;
+            --accent-blue-dim: #2563eb;
+            --accent-green: #10b981;
+            --accent-green-dim: rgba(16, 185, 129, 0.15);
+            --accent-red: #ef4444;
+            --accent-red-dim: rgba(239, 68, 68, 0.15);
+            --accent-yellow: #f59e0b;
+            --accent-yellow-dim: rgba(245, 158, 11, 0.15);
+            --accent-purple: #8b5cf6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        /* Subtle grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .app-container {
+            position: relative;
+            z-index: 1;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 18px;
+            color: white;
+            letter-spacing: -1px;
+        }
+
+        .logo-text h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-text span {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .site-name {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--accent-blue);
+            margin-left: 4px;
+        }
+
+        .site-name::before {
+            content: '//';
+            color: var(--text-muted);
+            margin-right: 4px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-blue-dim);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+            border-color: var(--border-highlight);
+        }
+
+        .btn-icon {
+            width: 18px;
+            height: 18px;
+            stroke-width: 2;
+        }
+
+        /* Dropdown */
+        .dropdown {
+            position: relative;
+        }
+
+        .dropdown-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dropdown-arrow {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.2s ease;
+        }
+
+        .dropdown.open .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            min-width: 200px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 8px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.2s ease;
+            z-index: 100;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .dropdown.open .dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 10px 12px;
+            background: none;
+            border: none;
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: left;
+        }
+
+        .dropdown-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .dropdown-item svg {
+            width: 18px;
+            height: 18px;
+            color: var(--text-secondary);
+        }
+
+        .dropdown-item:hover svg {
+            color: var(--accent-blue);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .modal-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            width: 90%;
+            max-width: 440px;
+            padding: 24px;
+            transform: scale(0.95);
+            transition: transform 0.2s ease;
+        }
+
+        .modal-overlay.open .modal {
+            transform: scale(1);
+        }
+
+        .modal-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .modal-icon.warning {
+            background: var(--accent-yellow-dim);
+            color: var(--accent-yellow);
+        }
+
+        .modal-icon svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .modal h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .modal p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .modal-actions .btn {
+            padding: 10px 20px;
+        }
+
+        .btn-danger {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stat-icon.total { background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); }
+        .stat-icon.running { background: var(--accent-green-dim); color: var(--accent-green); }
+        .stat-icon.stopped { background: rgba(100, 116, 139, 0.15); color: var(--text-secondary); }
+        .stat-icon.error { background: var(--accent-red-dim); color: var(--accent-red); }
+
+        .stat-icon svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .stat-info h3 {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -1px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .stat-info p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* Search and Filter Bar */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 16px;
+        }
+
+        .search-box {
+            flex: 1;
+            max-width: 400px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 16px 12px 44px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            background: var(--bg-tertiary);
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .search-box svg {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            color: var(--text-muted);
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .filter-btn {
+            padding: 10px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .filter-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .filter-btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+
+        /* Channel Grid */
+        .channel-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 16px;
+        }
+
+        .channel-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            overflow: hidden;
+            transition: all 0.25s ease;
+        }
+
+        .channel-card:hover {
+            border-color: var(--border-highlight);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .channel-header {
+            padding: 18px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .channel-title-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .channel-status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .channel-status-dot.running {
+            background: var(--accent-green);
+            box-shadow: 0 0 12px var(--accent-green);
+            animation: pulse 2s infinite;
+        }
+
+        .channel-status-dot.stopped {
+            background: var(--text-muted);
+        }
+
+        .channel-status-dot.error {
+            background: var(--accent-red);
+            box-shadow: 0 0 12px var(--accent-red);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .channel-title {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .channel-title h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .channel-title h3 a {
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .channel-title h3 a:hover {
+            color: var(--accent-blue);
+        }
+
+        .channel-id {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .channel-badges {
+            display: flex;
+            gap: 6px;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-ha {
+            background: var(--accent-green-dim);
+            color: var(--accent-green);
+        }
+
+        /* Signal Bars - Stream Health Indicator */
+        .signal-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 16px;
+            padding: 0 4px;
+        }
+
+        .signal-bars .bar {
+            width: 4px;
+            border-radius: 1px;
+            background: var(--text-muted);
+            transition: all 0.3s ease;
+        }
+
+        .signal-bars .bar:nth-child(1) { height: 4px; }
+        .signal-bars .bar:nth-child(2) { height: 8px; }
+        .signal-bars .bar:nth-child(3) { height: 12px; }
+        .signal-bars .bar:nth-child(4) { height: 16px; }
+
+        /* Healthy - all bars green with animation */
+        .signal-bars.healthy .bar {
+            background: var(--accent-green);
+            box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+            animation: signal-pulse 2s ease-in-out infinite;
+        }
+
+        .signal-bars.healthy .bar:nth-child(1) { animation-delay: 0s; }
+        .signal-bars.healthy .bar:nth-child(2) { animation-delay: 0.1s; }
+        .signal-bars.healthy .bar:nth-child(3) { animation-delay: 0.2s; }
+        .signal-bars.healthy .bar:nth-child(4) { animation-delay: 0.3s; }
+
+        @keyframes signal-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Degraded - yellow, fewer bars */
+        .signal-bars.degraded .bar:nth-child(1),
+        .signal-bars.degraded .bar:nth-child(2),
+        .signal-bars.degraded .bar:nth-child(3) {
+            background: var(--accent-yellow);
+        }
+
+        /* Poor - red, only 1-2 bars */
+        .signal-bars.poor .bar:nth-child(1),
+        .signal-bars.poor .bar:nth-child(2) {
+            background: var(--accent-red);
+        }
+
+        /* No signal - all gray */
+        .signal-bars.none .bar {
+            background: var(--text-muted);
+            opacity: 0.4;
+        }
+
+        /* Offline/stopped - very dim */
+        .signal-bars.offline .bar {
+            background: var(--text-muted);
+            opacity: 0.2;
+        }
+
+        .channel-body {
+            padding: 16px 20px;
+        }
+
+        .channel-urls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .url-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .url-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            width: 50px;
+            flex-shrink: 0;
+        }
+
+        .url-value {
+            flex: 1;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: var(--bg-primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .channel-footer {
+            padding: 14px 20px;
+            background: var(--bg-primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metrics-port {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .channel-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            font-family: inherit;
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .action-btn.start {
+            background: var(--accent-green-dim);
+            color: var(--accent-green);
+        }
+
+        .action-btn.start:hover:not(:disabled) {
+            background: var(--accent-green);
+            color: white;
+        }
+
+        .action-btn.stop {
+            background: var(--accent-red-dim);
+            color: var(--accent-red);
+        }
+
+        .action-btn.stop:hover:not(:disabled) {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        .action-btn.edit {
+            background: var(--accent-yellow-dim);
+            color: var(--accent-yellow);
+            text-decoration: none;
+        }
+
+        .action-btn.edit:hover {
+            background: var(--accent-yellow);
+            color: var(--bg-primary);
+        }
+
+        .action-btn.delete {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .action-btn.delete:hover:not(:disabled) {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 80px 40px;
+            background: var(--bg-secondary);
+            border: 1px dashed var(--border-color);
+            border-radius: 14px;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .empty-state p {
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+
+        /* No Results */
+        .no-results {
+            text-align: center;
+            padding: 60px 40px;
+            color: var(--text-secondary);
+        }
+
+        .no-results svg {
+            width: 48px;
+            height: 48px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .stats-bar {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 16px;
+                align-items: flex-start;
+            }
+
+            .stats-bar {
+                grid-template-columns: 1fr;
+            }
+
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-box {
+                max-width: none;
+            }
+
+            .filter-buttons {
+                overflow-x: auto;
+                padding-bottom: 8px;
+            }
+
+            .channel-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo-section">
+                <div class="logo-icon" id="logoIcon">R</div>
+                <div class="logo-text">
+                    <h1>RIST Manager <span class="site-name" id="siteName"></span></h1>
+                    <span>Reliable Internet Stream Transport</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div class="dropdown">
+                    <button class="btn btn-secondary dropdown-toggle" onclick="toggleDropdown()">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M12 3v12M8 11l4 4 4-4"/>
+                            <path d="M3 15v4a2 2 0 002 2h14a2 2 0 002-2v-4"/>
+                        </svg>
+                        Config
+                        <svg class="dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
+                    <div class="dropdown-menu" id="configDropdown">
+                        <button class="dropdown-item" onclick="downloadBackup()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Download Backup
+                        </button>
+                        <button class="dropdown-item" onclick="document.getElementById('restoreInput').click()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                            Restore Backup
+                        </button>
+                        <button class="dropdown-item" id="revertBtn" onclick="revertConfig()" style="display: none;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/>
+                                <path d="M3 3v5h5"/>
+                            </svg>
+                            Revert to Previous
+                        </button>
+                    </div>
+                </div>
+                <input type="file" id="restoreInput" accept=".json" style="display: none;" onchange="handleRestoreFile(event)">
+                <a href="dash.html" class="btn btn-secondary">
+                    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M3 12h4l3-9 4 18 3-9h4"/>
+                    </svg>
+                    System Stats
+                </a>
+                <a href="channel_config.html" class="btn btn-primary">
+                    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                    Add Channel
+                </a>
+            </div>
+        </header>
+
+        <!-- Stats Bar -->
+        <div class="stats-bar">
+            <div class="stat-card">
+                <div class="stat-icon total">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2"/>
+                        <path d="M8 21h8M12 17v4"/>
+                    </svg>
+                </div>
+                <div class="stat-info">
+                    <h3 id="totalChannels">0</h3>
+                    <p>Total Channels</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon running">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                </div>
+                <div class="stat-info">
+                    <h3 id="runningChannels">0</h3>
+                    <p>Running</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon stopped">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="6" y="4" width="4" height="16"/>
+                        <rect x="14" y="4" width="4" height="16"/>
+                    </svg>
+                </div>
+                <div class="stat-info">
+                    <h3 id="stoppedChannels">0</h3>
+                    <p>Stopped</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon error">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 8v4M12 16h.01"/>
+                    </svg>
+                </div>
+                <div class="stat-info">
+                    <h3 id="errorChannels">0</h3>
+                    <p>Errors</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <div class="search-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="M21 21l-4.35-4.35"/>
+                </svg>
+                <input type="text" id="searchInput" placeholder="Search channels by name, input, or output...">
+            </div>
+            <div class="filter-buttons">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="running">Running</button>
+                <button class="filter-btn" data-filter="stopped">Stopped</button>
+                <button class="filter-btn" data-filter="error">Errors</button>
+            </div>
+        </div>
+
+        <!-- Channel Grid -->
+        <div class="channel-grid" id="channelGrid">
+            <!-- Channels will be populated here -->
+        </div>
+
+        <!-- Empty State (shown when no channels exist) -->
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                <path d="M8 21h8M12 17v4"/>
+                <path d="M9 10h6M12 7v6"/>
+            </svg>
+            <h3>No channels configured</h3>
+            <p>Get started by adding your first RIST channel</p>
+            <a href="channel_config.html" class="btn btn-primary">
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M12 5v14M5 12h14"/>
+                </svg>
+                Add Channel
+            </a>
+        </div>
+
+        <!-- No Results (shown when search/filter returns nothing) -->
+        <div class="no-results" id="noResults" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21l-4.35-4.35"/>
+                <path d="M8 8l6 6M14 8l-6 6"/>
+            </svg>
+            <h3>No channels found</h3>
+            <p>Try adjusting your search or filter</p>
+        </div>
+
+        <!-- Confirmation Modal -->
+        <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+            <div class="modal" onclick="event.stopPropagation()">
+                <div class="modal-icon warning">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                </div>
+                <h3 id="modalTitle">Confirm Action</h3>
+                <p id="modalMessage">Are you sure you want to proceed?</p>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-danger" id="modalConfirmBtn" onclick="confirmModalAction()">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
+
+        // Modal state
+        let modalAction = null;
+        let pendingRestoreData = null;
+
+        // Dropdown toggle
+        function toggleDropdown() {
+            document.querySelector('.dropdown').classList.toggle('open');
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.querySelector('.dropdown');
+            if (!dropdown.contains(e.target)) {
+                dropdown.classList.remove('open');
+            }
+        });
+
+        // Modal functions
+        function openModal(title, message, action) {
+            modalAction = action;
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+            document.getElementById('modalOverlay').classList.add('open');
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('modalOverlay').classList.remove('open');
+            modalAction = null;
+        }
+
+        function confirmModalAction() {
+            if (modalAction) {
+                modalAction();
+            }
+            closeModal();
+        }
+
+        // Check for .bak files on load
+        async function checkBackupExists() {
+            try {
+                const response = await fetch(`${API_BASE}/config/has-backup`);
+                const data = await response.json();
+                const revertBtn = document.getElementById('revertBtn');
+                if (data.has_backup) {
+                    revertBtn.style.display = 'flex';
+                    if (data.backup_timestamp) {
+                        const date = new Date(data.backup_timestamp).toLocaleString();
+                        revertBtn.title = `Backup from: ${date}`;
+                    }
+                } else {
+                    revertBtn.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error checking backup:', error);
+            }
+        }
+
+        // Download backup
+        async function downloadBackup() {
+            document.querySelector('.dropdown').classList.remove('open');
+            try {
+                const response = await fetch(`${API_BASE}/config/backup`);
+                if (!response.ok) throw new Error('Failed to download backup');
+                
+                const data = await response.json();
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                const hostname = data.hostname || 'rist';
+                const date = new Date().toISOString().split('T')[0];
+                a.download = `${hostname}-config-${date}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Error downloading backup:', error);
+                alert('Failed to download backup: ' + error.message);
+            }
+        }
+
+        // Handle restore file selection
+        function handleRestoreFile(event) {
+            document.querySelector('.dropdown').classList.remove('open');
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    pendingRestoreData = JSON.parse(e.target.result);
+                    
+                    // Validate backup
+                    if (!pendingRestoreData.receiver_config) {
+                        throw new Error('Invalid backup file: missing configuration data');
+                    }
+                    
+                    const channelCount = Object.keys(pendingRestoreData.receiver_config.channels || {}).length;
+                    const hostname = pendingRestoreData.hostname || 'unknown';
+                    const timestamp = pendingRestoreData.timestamp 
+                        ? new Date(pendingRestoreData.timestamp).toLocaleString()
+                        : 'unknown';
+                    
+                    openModal(
+                        'Restore Configuration',
+                        `This will replace your current configuration with a backup from "${hostname}" (${timestamp}) containing ${channelCount} channel(s). All running channels will be stopped. Current config will be saved as .bak for potential revert.`,
+                        executeRestore
+                    );
+                } catch (error) {
+                    alert('Invalid backup file: ' + error.message);
+                    pendingRestoreData = null;
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
+        }
+
+        // Execute restore
+        async function executeRestore() {
+            if (!pendingRestoreData) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/config/restore`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(pendingRestoreData)
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Restore failed');
+                }
+                
+                const result = await response.json();
+                alert(`Configuration restored successfully! ${result.channels_restored} channel(s) restored.`);
+                
+                // Refresh the page
+                window.location.reload();
+            } catch (error) {
+                console.error('Error restoring config:', error);
+                alert('Failed to restore configuration: ' + error.message);
+            } finally {
+                pendingRestoreData = null;
+            }
+        }
+
+        // Revert to .bak
+        function revertConfig() {
+            document.querySelector('.dropdown').classList.remove('open');
+            openModal(
+                'Revert Configuration',
+                'This will revert to the previous configuration that was saved before the last restore. All running channels will be stopped.',
+                executeRevert
+            );
+        }
+
+        async function executeRevert() {
+            try {
+                const response = await fetch(`${API_BASE}/config/revert`, {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Revert failed');
+                }
+                
+                const result = await response.json();
+                alert(`Configuration reverted successfully! ${result.channels_restored} channel(s) restored.`);
+                
+                // Refresh the page
+                window.location.reload();
+            } catch (error) {
+                console.error('Error reverting config:', error);
+                alert('Failed to revert configuration: ' + error.message);
+            }
+        }
+
+        // Fetch and display hostname
+        async function loadHostname() {
+            try {
+                const response = await fetch(`${API_BASE}/system/hostname`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const hostname = data.hostname || '';
+                    document.getElementById('siteName').textContent = hostname;
+                    document.title = `RIST Manager // ${hostname}`;
+                    
+                    // Set first letter in logo icon
+                    if (hostname) {
+                        document.getElementById('logoIcon').textContent = hostname.charAt(0).toUpperCase();
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching hostname:', error);
+            }
+        }
+
+        class ChannelManager {
+            constructor() {
+                this.channels = {};
+                this.backupHealth = {};
+                this.channelMetrics = {};
+                this.currentFilter = 'all';
+                this.searchQuery = '';
+                this.pollingInterval = null;
+                this.isPolling = false;
+            }
+
+            async fetchChannelMetrics(channelId) {
+                try {
+                    const response = await fetch(`${API_BASE}/channels/${channelId}/metrics`, {
+                        cache: 'no-store',
+                        headers: { 'Cache-Control': 'no-cache' }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.channelMetrics[channelId] = {
+                            peers: data.peers || 0,
+                            quality: data.quality || 0
+                        };
+                    }
+                } catch (error) {
+                    console.error(`Error fetching metrics for ${channelId}:`, error);
+                    this.channelMetrics[channelId] = { peers: 0, quality: 0 };
+                }
+            }
+
+            async fetchBackupHealth(channelId) {
+                try {
+                    const response = await fetch(`${API_BASE}/channels/${channelId}/backup-health`, {
+                        cache: 'no-store',
+                        headers: { 'Cache-Control': 'no-cache' }
+                    });
+                    const data = await response.json();
+                    this.backupHealth[channelId] = data;
+                    return data;
+                } catch (error) {
+                    console.error(`Error fetching backup health for ${channelId}:`, error);
+                    this.backupHealth[channelId] = { has_backups: false, is_healthy: false };
+                    return this.backupHealth[channelId];
+                }
+            }
+
+            async loadChannels() {
+                if (this.isPolling) return;
+
+                try {
+                    this.isPolling = true;
+                    const response = await fetch(`${API_BASE}/channels`, {
+                        cache: 'no-store',
+                        headers: { 'Cache-Control': 'no-cache' }
+                    });
+                    const channels = await response.json();
+                    this.channels = channels;
+
+                    // Fetch backup health for all channels
+                    await Promise.all(
+                        Object.keys(channels).map(id => this.fetchBackupHealth(id))
+                    );
+
+                    // Fetch metrics for running channels
+                    const runningChannels = Object.entries(channels)
+                        .filter(([id, ch]) => ch.status === 'running')
+                        .map(([id]) => id);
+                    
+                    await Promise.all(
+                        runningChannels.map(id => this.fetchChannelMetrics(id))
+                    );
+
+                    this.updateStats();
+                    this.renderChannels();
+                } catch (error) {
+                    console.error('Error loading channels:', error);
+                } finally {
+                    this.isPolling = false;
+                }
+            }
+
+            updateStats() {
+                const channels = Object.values(this.channels);
+                const running = channels.filter(c => c.status === 'running').length;
+                const stopped = channels.filter(c => c.status === 'stopped').length;
+                const errors = channels.filter(c => c.status === 'error').length;
+
+                document.getElementById('totalChannels').textContent = channels.length;
+                document.getElementById('runningChannels').textContent = running;
+                document.getElementById('stoppedChannels').textContent = stopped;
+                document.getElementById('errorChannels').textContent = errors;
+            }
+
+            getFilteredChannels() {
+                return Object.entries(this.channels).filter(([id, channel]) => {
+                    // Apply status filter
+                    if (this.currentFilter !== 'all' && channel.status !== this.currentFilter) {
+                        return false;
+                    }
+
+                    // Apply search filter
+                    if (this.searchQuery) {
+                        const query = this.searchQuery.toLowerCase();
+                        const searchableText = `${channel.name} ${channel.input} ${channel.output} ${id}`.toLowerCase();
+                        if (!searchableText.includes(query)) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                });
+            }
+
+            renderChannels() {
+                const grid = document.getElementById('channelGrid');
+                const emptyState = document.getElementById('emptyState');
+                const noResults = document.getElementById('noResults');
+
+                const totalChannels = Object.keys(this.channels).length;
+                const filteredChannels = this.getFilteredChannels();
+
+                if (totalChannels === 0) {
+                    grid.style.display = 'none';
+                    noResults.style.display = 'none';
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                emptyState.style.display = 'none';
+
+                if (filteredChannels.length === 0) {
+                    grid.style.display = 'none';
+                    noResults.style.display = 'block';
+                    return;
+                }
+
+                noResults.style.display = 'none';
+                grid.style.display = 'grid';
+                grid.innerHTML = filteredChannels.map(([id, channel]) => 
+                    this.createChannelCard(id, channel)
+                ).join('');
+            }
+
+            createChannelCard(channelId, channel) {
+                const health = this.backupHealth[channelId] || {};
+                const metrics = this.channelMetrics[channelId] || {};
+                const statusClass = channel.status === 'running' ? 'running' : 
+                                  channel.status === 'error' ? 'error' : 'stopped';
+                const isRunning = channel.status === 'running';
+                
+                // Determine signal strength based on metrics
+                let signalClass = 'offline';
+                if (isRunning) {
+                    if (metrics.peers > 0 && metrics.quality >= 95) {
+                        signalClass = 'healthy';
+                    } else if (metrics.peers > 0 && metrics.quality >= 80) {
+                        signalClass = 'degraded';
+                    } else if (metrics.peers > 0) {
+                        signalClass = 'poor';
+                    } else {
+                        signalClass = 'none';
+                    }
+                }
+
+                // Only show HA badge if has backups
+                const haBadge = health.has_backups 
+                    ? '<span class="badge badge-ha">HA</span>' 
+                    : '';
+
+                return `
+                    <div class="channel-card" data-channel-id="${channelId}">
+                        <div class="channel-header">
+                            <div class="channel-title-section">
+                                <div class="channel-status-dot ${statusClass}"></div>
+                                <div class="channel-title">
+                                    <h3><a href="stats.html?channel=${channelId}">${channel.name}</a></h3>
+                                    <span class="channel-id">${channelId}</span>
+                                </div>
+                            </div>
+                            <div class="channel-badges">
+                                <div class="signal-bars ${signalClass}" title="Stream: ${signalClass}">
+                                    <div class="bar"></div>
+                                    <div class="bar"></div>
+                                    <div class="bar"></div>
+                                    <div class="bar"></div>
+                                </div>
+                                ${haBadge}
+                            </div>
+                        </div>
+                        <div class="channel-body">
+                            <div class="channel-urls">
+                                <div class="url-row">
+                                    <span class="url-label">Input</span>
+                                    <span class="url-value" title="${channel.input}">${channel.input}</span>
+                                </div>
+                                <div class="url-row">
+                                    <span class="url-label">Output</span>
+                                    <span class="url-value" title="${channel.output}">${channel.output}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="channel-footer">
+                            <span class="metrics-port">Port: ${channel.metrics_port}</span>
+                            <div class="channel-actions">
+                                <button class="action-btn ${isRunning ? 'stop' : 'start'}" 
+                                        onclick="channelManager.toggleChannel('${channelId}')">
+                                    ${isRunning ? 'Stop' : 'Start'}
+                                </button>
+                                <a href="edit.html?channel=${channelId}" class="action-btn edit">Edit</a>
+                                <button class="action-btn delete" 
+                                        onclick="channelManager.deleteChannel('${channelId}')">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            async toggleChannel(channelId) {
+                const channel = this.channels[channelId];
+                const isStarting = channel.status !== 'running';
+                const card = document.querySelector(`[data-channel-id="${channelId}"]`);
+                const btn = card.querySelector('.action-btn.start, .action-btn.stop');
+
+                btn.disabled = true;
+                btn.textContent = isStarting ? 'Starting...' : 'Stopping...';
+
+                try {
+                    const response = await fetch(
+                        `${API_BASE}/channels/${channelId}/${isStarting ? 'start' : 'stop'}`,
+                        { method: 'PUT', cache: 'no-store' }
+                    );
+
+                    if (!response.ok) {
+                        throw new Error(`Failed to ${isStarting ? 'start' : 'stop'} channel`);
+                    }
+
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    await this.loadChannels();
+                } catch (error) {
+                    console.error('Error toggling channel:', error);
+                    alert(`Error: ${error.message}`);
+                    btn.disabled = false;
+                    btn.textContent = isStarting ? 'Start' : 'Stop';
+                }
+            }
+
+            async deleteChannel(channelId) {
+                if (!confirm(`Are you sure you want to delete "${this.channels[channelId].name}"?`)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${API_BASE}/channels/${channelId}`, {
+                        method: 'DELETE',
+                        cache: 'no-store'
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Failed to delete channel');
+                    }
+
+                    await this.loadChannels();
+                } catch (error) {
+                    console.error('Error deleting channel:', error);
+                    alert(`Error deleting channel: ${error.message}`);
+                }
+            }
+
+            setFilter(filter) {
+                this.currentFilter = filter;
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.filter === filter);
+                });
+                this.renderChannels();
+            }
+
+            setSearch(query) {
+                this.searchQuery = query;
+                this.renderChannels();
+            }
+
+            startPolling(interval = 5000) {
+                if (this.pollingInterval) {
+                    clearInterval(this.pollingInterval);
+                }
+                this.pollingInterval = setInterval(() => this.loadChannels(), interval);
+            }
+
+            stopPolling() {
+                if (this.pollingInterval) {
+                    clearInterval(this.pollingInterval);
+                    this.pollingInterval = null;
+                }
+            }
+        }
+
+        const channelManager = new ChannelManager();
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHostname();
+            checkBackupExists();
+            channelManager.loadChannels();
+            channelManager.startPolling();
+
+            // Search handler
+            const searchInput = document.getElementById('searchInput');
+            let searchTimeout;
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    channelManager.setSearch(e.target.value);
+                }, 200);
+            });
+
+            // Filter handlers
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    channelManager.setFilter(btn.dataset.filter);
+                });
+            });
+
+            // Cleanup on unload
+            window.addEventListener('unload', () => {
+                channelManager.stopPolling();
+            });
+        });
+    </script>
+</body>
+</html>
