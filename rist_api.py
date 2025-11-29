@@ -1,5 +1,4 @@
 from fastapi import FastAPI, HTTPException, Query, Body, Request, Response, Depends, Cookie
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 import yaml
@@ -156,20 +155,46 @@ async def require_auth(request: Request):
 PUBLIC_PATHS = ["/auth/login", "/auth/status", "/auth/logout", "/docs", "/openapi.json", "/"]
 
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Custom CORS middleware that handles credentials properly
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+
+class CORSMiddlewareCustom(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Get the origin from the request
+        origin = request.headers.get("origin", "")
+        
+        # Handle preflight requests
+        if request.method == "OPTIONS":
+            response = Response(status_code=200)
+            response.headers["Access-Control-Allow-Origin"] = origin if origin else "*"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Cookie"
+            response.headers["Access-Control-Max-Age"] = "600"
+            return response
+        
+        # Process the request
+        response = await call_next(request)
+        
+        # Add CORS headers to response
+        response.headers["Access-Control-Allow-Origin"] = origin if origin else "*"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Cookie"
+        
+        return response
+
+app.add_middleware(CORSMiddlewareCustom)
 
 
 # Authentication Middleware
-from starlette.middleware.base import BaseHTTPMiddleware
-
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        # Skip auth for OPTIONS (preflight) requests
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        
         # Skip auth for public paths
         path = request.url.path
         if any(path.startswith(p) for p in PUBLIC_PATHS):
