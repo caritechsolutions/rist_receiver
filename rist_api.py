@@ -578,7 +578,17 @@ def get_network_interfaces():
             try:
                 with open(f"/sys/class/net/{iface}/operstate", "r") as f:
                     state = f.read().strip()
-                    iface_info["status"] = "up" if state == "up" else "down"
+                    # "up" = up, "unknown" = often used by WireGuard/tun interfaces when active
+                    if state == "up":
+                        iface_info["status"] = "up"
+                    elif state == "unknown":
+                        # For WireGuard/tunnel interfaces, check if they have an IP
+                        if iface_info["ipv4"] or iface_info["ipv6"]:
+                            iface_info["status"] = "up"
+                        else:
+                            iface_info["status"] = "down"
+                    else:
+                        iface_info["status"] = "down"
             except:
                 # If we have an IP, assume it's up
                 if iface_info["ipv4"] or iface_info["ipv6"]:
