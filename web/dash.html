@@ -325,6 +325,234 @@
         .network-stat.rx .value { color: var(--accent-green); }
         .network-stat.tx .value { color: var(--accent-blue); }
 
+        /* Network Interfaces Detail Grid */
+        .interfaces-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+        }
+
+        .interface-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .interface-card.down {
+            opacity: 0.6;
+        }
+
+        .interface-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .interface-name-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .interface-name-badge .name {
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .interface-type {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .interface-type.physical { background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); }
+        .interface-type.wireguard { background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); }
+        .interface-type.loopback { background: rgba(100, 116, 139, 0.15); color: var(--text-secondary); }
+        .interface-type.virtual { background: rgba(245, 158, 11, 0.15); color: var(--accent-yellow); }
+
+        .interface-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .interface-status .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .interface-status.up .dot {
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        .interface-status.up { color: var(--accent-green); }
+
+        .interface-status.down .dot {
+            background: var(--text-muted);
+        }
+
+        .interface-status.down { color: var(--text-muted); }
+
+        .interface-details {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .interface-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+        }
+
+        .interface-row .label {
+            color: var(--text-muted);
+        }
+
+        .interface-row .value {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-primary);
+        }
+
+        .interface-row .value.ip {
+            color: var(--accent-blue);
+        }
+
+        /* WireGuard Section */
+        .wg-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .wg-status .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .wg-status .status-dot.active {
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        .wg-status .status-dot.offline {
+            background: var(--text-muted);
+        }
+
+        .wg-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .wg-controls {
+            display: flex;
+            gap: 12px;
+        }
+
+        .file-upload-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .file-upload-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--border-highlight);
+        }
+
+        .file-upload-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .wg-editor-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .wg-editor-container label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .wg-editor {
+            width: 100%;
+            min-height: 250px;
+            padding: 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            resize: vertical;
+        }
+
+        .wg-editor:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .wg-editor::placeholder {
+            color: var(--text-muted);
+        }
+
+        .wg-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .wg-info {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .wg-info h4 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .wg-info pre {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-primary);
+            white-space: pre-wrap;
+            margin: 0;
+        }
+
         /* Responsive */
         @media (max-width: 1200px) {
             .stats-grid {
@@ -470,14 +698,87 @@
             </div>
         </div>
 
-        <!-- Network Interfaces -->
+        <!-- Network Interfaces Detail -->
         <div class="panel full-width">
             <div class="panel-header">
                 <h2>Network Interfaces</h2>
             </div>
             <div class="panel-body">
+                <div id="interfacesGrid" class="interfaces-grid">
+                    <!-- Interface cards will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Bandwidth Monitor (existing) -->
+        <div class="panel full-width">
+            <div class="panel-header">
+                <h2>Bandwidth Monitor</h2>
+            </div>
+            <div class="panel-body">
                 <div id="networkGrid" class="network-grid">
-                    <!-- Network cards will be populated here -->
+                    <!-- Bandwidth cards will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- WireGuard Configuration -->
+        <div class="panel full-width">
+            <div class="panel-header">
+                <h2>WireGuard VPN</h2>
+                <div class="wg-status" id="wgStatus">
+                    <span class="status-dot offline"></span>
+                    <span>Checking...</span>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div class="wg-container">
+                    <div class="wg-controls">
+                        <label class="file-upload-btn">
+                            <input type="file" id="wgFileInput" accept=".conf" style="display: none;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                            Upload Config
+                        </label>
+                        <button class="btn btn-secondary" onclick="refreshWireGuard()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 4v6h-6M1 20v-6h6"/>
+                                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                            </svg>
+                            Refresh
+                        </button>
+                    </div>
+                    <div class="wg-editor-container">
+                        <label for="wgConfig">Configuration (/etc/wireguard/wg0.conf)</label>
+                        <textarea id="wgConfig" class="wg-editor" placeholder="# WireGuard configuration will appear here...
+# Upload a .conf file or paste your configuration
+
+[Interface]
+PrivateKey = your_private_key
+Address = 10.0.0.2/24
+
+[Peer]
+PublicKey = peer_public_key
+Endpoint = vpn.example.com:51820
+AllowedIPs = 0.0.0.0/0"></textarea>
+                    </div>
+                    <div class="wg-actions">
+                        <button class="btn btn-primary" onclick="saveWireGuard()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                                <polyline points="17 21 17 13 7 13 7 21"/>
+                                <polyline points="7 3 7 8 15 8"/>
+                            </svg>
+                            Save &amp; Apply
+                        </button>
+                    </div>
+                    <div class="wg-info" id="wgInfo" style="display: none;">
+                        <h4>Connection Status</h4>
+                        <pre id="wgStatusDetail"></pre>
+                    </div>
                 </div>
             </div>
         </div>
@@ -774,12 +1075,192 @@
             }
         }
 
+        // Get interface type
+        function getInterfaceType(name) {
+            if (name === 'lo') return { type: 'loopback', label: 'Loopback' };
+            if (name.startsWith('wg')) return { type: 'wireguard', label: 'WireGuard' };
+            if (name.startsWith('eth') || name.startsWith('en')) return { type: 'physical', label: 'Ethernet' };
+            if (name.startsWith('wlan') || name.startsWith('wl')) return { type: 'physical', label: 'WiFi' };
+            if (name.startsWith('docker') || name.startsWith('br-') || name.startsWith('veth')) return { type: 'virtual', label: 'Docker' };
+            return { type: 'virtual', label: 'Virtual' };
+        }
+
+        // Format speed
+        function formatSpeed(mbps) {
+            if (!mbps) return 'N/A';
+            if (mbps >= 1000) return `${(mbps / 1000).toFixed(0)} Gbps`;
+            return `${mbps} Mbps`;
+        }
+
+        // Update network interfaces detail
+        async function updateNetworkInterfaces() {
+            try {
+                const response = await fetch(`${API_BASE}/system/network-interfaces`);
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                const grid = document.getElementById('interfacesGrid');
+                grid.innerHTML = '';
+
+                data.interfaces.forEach(iface => {
+                    const typeInfo = getInterfaceType(iface.name);
+                    const isUp = iface.status === 'up';
+                    const ipv4 = iface.ipv4.length > 0 ? iface.ipv4[0].address : 'No IP';
+                    const netmask = iface.ipv4.length > 0 ? iface.ipv4[0].netmask : '';
+                    
+                    const card = document.createElement('div');
+                    card.className = `interface-card ${isUp ? '' : 'down'}`;
+                    card.innerHTML = `
+                        <div class="interface-header">
+                            <div class="interface-name-badge">
+                                <span class="name">${iface.name}</span>
+                                <span class="interface-type ${typeInfo.type}">${typeInfo.label}</span>
+                            </div>
+                            <div class="interface-status ${iface.status}">
+                                <span class="dot"></span>
+                                ${isUp ? 'Up' : 'Down'}
+                            </div>
+                        </div>
+                        <div class="interface-details">
+                            <div class="interface-row">
+                                <span class="label">IPv4</span>
+                                <span class="value ip">${ipv4}${netmask ? ' / ' + netmask : ''}</span>
+                            </div>
+                            ${iface.mac ? `
+                            <div class="interface-row">
+                                <span class="label">MAC</span>
+                                <span class="value">${iface.mac}</span>
+                            </div>
+                            ` : ''}
+                            ${iface.speed ? `
+                            <div class="interface-row">
+                                <span class="label">Speed</span>
+                                <span class="value">${formatSpeed(iface.speed)}</span>
+                            </div>
+                            ` : ''}
+                            ${iface.mtu ? `
+                            <div class="interface-row">
+                                <span class="label">MTU</span>
+                                <span class="value">${iface.mtu}</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Error fetching network interfaces:', error);
+            }
+        }
+
+        // WireGuard functions
+        async function loadWireGuard() {
+            try {
+                const response = await fetch(`${API_BASE}/system/wireguard`);
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                
+                // Update status indicator
+                const statusEl = document.getElementById('wgStatus');
+                const isActive = data.service_status === 'active';
+                statusEl.innerHTML = `
+                    <span class="status-dot ${isActive ? 'active' : 'offline'}"></span>
+                    <span>${isActive ? 'Connected' : 'Disconnected'}</span>
+                `;
+                
+                // Update config editor
+                if (data.config_content) {
+                    document.getElementById('wgConfig').value = data.config_content;
+                }
+                
+                // Update status detail
+                const infoEl = document.getElementById('wgInfo');
+                const detailEl = document.getElementById('wgStatusDetail');
+                if (data.wg_status) {
+                    infoEl.style.display = 'block';
+                    detailEl.textContent = data.wg_status;
+                } else {
+                    infoEl.style.display = 'none';
+                }
+                
+            } catch (error) {
+                console.error('Error loading WireGuard config:', error);
+            }
+        }
+
+        async function saveWireGuard() {
+            const config = document.getElementById('wgConfig').value;
+            
+            if (!config.trim()) {
+                alert('Configuration cannot be empty');
+                return;
+            }
+            
+            if (!config.includes('[Interface]')) {
+                alert('Invalid configuration: missing [Interface] section');
+                return;
+            }
+            
+            if (!confirm('This will save the WireGuard configuration and restart the service. Continue?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/system/wireguard`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ config_content: config })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to save configuration');
+                }
+                
+                alert('WireGuard configuration saved and service started!');
+                
+                // Refresh status after a short delay
+                setTimeout(() => {
+                    loadWireGuard();
+                    updateNetworkInterfaces();
+                }, 2000);
+                
+            } catch (error) {
+                console.error('Error saving WireGuard config:', error);
+                alert('Failed to save configuration: ' + error.message);
+            }
+        }
+
+        function refreshWireGuard() {
+            loadWireGuard();
+        }
+
+        // Handle file upload
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('wgFileInput').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    document.getElementById('wgConfig').value = event.target.result;
+                };
+                reader.readAsText(file);
+                e.target.value = ''; // Reset input
+            });
+        });
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             loadHostname();
             initCharts();
             updateMetrics();
+            updateNetworkInterfaces();
+            loadWireGuard();
+            
             setInterval(updateMetrics, 5000);
+            setInterval(updateNetworkInterfaces, 10000); // Refresh interfaces every 10s
         });
     </script>
 </body>
