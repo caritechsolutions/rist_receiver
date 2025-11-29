@@ -451,10 +451,44 @@
         const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
         const channelId = new URLSearchParams(window.location.search).get('channel');
 
+        // Check authentication on page load
+        async function checkAuth() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/status`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (!data.authenticated) {
+                    window.location.href = '/login.html';
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                window.location.href = '/login.html';
+                return false;
+            }
+        }
+
+        // Logout function
+        async function logout() {
+            try {
+                await fetch(`${API_BASE}/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+            window.location.href = '/login.html';
+        }
+
         // Fetch hostname
         async function loadHostname() {
             try {
-                const response = await fetch(`${API_BASE}/system/hostname`);
+                const response = await fetch(`${API_BASE}/system/hostname`, {
+                    credentials: 'include'
+                });
                 if (response.ok) {
                     const data = await response.json();
                     document.getElementById('siteName').textContent = data.hostname || '';
@@ -473,8 +507,8 @@
 
             try {
                 const [channelResponse, backupSourcesResponse] = await Promise.all([
-                    fetch(`${API_BASE}/channels/${channelId}`),
-                    fetch(`${API_BASE}/channels/${channelId}/backup-sources`)
+                    fetch(`${API_BASE}/channels/${channelId}`, { credentials: 'include' }),
+                    fetch(`${API_BASE}/channels/${channelId}/backup-sources`, { credentials: 'include' })
                 ]);
 
                 if (!channelResponse.ok) {
@@ -587,7 +621,10 @@
         });
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            const isAuthenticated = await checkAuth();
+            if (!isAuthenticated) return;
+            
             loadHostname();
             loadChannel();
         });
