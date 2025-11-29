@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Channel Statistics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.6.0-beta.1.0.canary.10759/hls.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #111820;
+            --bg-tertiary: #1a2332;
+            --bg-hover: #232d3f;
+            --border-color: #2a3a4d;
+            --border-highlight: #3d5a80;
+            --text-primary: #e8eef4;
+            --text-secondary: #8899a8;
+            --text-muted: #5a6a7a;
+            --accent-blue: #3b82f6;
+            --accent-blue-dim: #2563eb;
+            --accent-green: #10b981;
+            --accent-green-dim: rgba(16, 185, 129, 0.15);
+            --accent-red: #ef4444;
+            --accent-red-dim: rgba(239, 68, 68, 0.15);
+            --accent-yellow: #f59e0b;
+            --accent-yellow-dim: rgba(245, 158, 11, 0.15);
+            --accent-purple: #8b5cf6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .app-container {
+            position: relative;
+            z-index: 1;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-color: var(--border-highlight);
+        }
+
+        .back-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .channel-info h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .channel-info .site-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--accent-blue);
+        }
+
+        .channel-info .site-name::before {
+            content: '//';
+            color: var(--text-muted);
+            margin-right: 4px;
+        }
+
+        .channel-info p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 4px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .status-badge.connected {
+            background: var(--accent-green-dim);
+            color: var(--accent-green);
+        }
+
+        .status-badge.disconnected {
+            background: var(--accent-red-dim);
+            color: var(--accent-red);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .status-badge.connected .status-dot {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            text-decoration: none;
+            font-family: inherit;
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+            border-color: var(--border-highlight);
+        }
+
+        .btn-start {
+            background: var(--accent-green-dim);
+            color: var(--accent-green);
+        }
+
+        .btn-start:hover:not(:disabled) {
+            background: var(--accent-green);
+            color: white;
+        }
+
+        .btn-stop {
+            background: var(--accent-red-dim);
+            color: var(--accent-red);
+        }
+
+        .btn-stop:hover:not(:disabled) {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        .btn-edit {
+            background: var(--accent-yellow-dim);
+            color: var(--accent-yellow);
+        }
+
+        .btn-edit:hover {
+            background: var(--accent-yellow);
+            color: var(--bg-primary);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Grid Layout */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: -1px;
+        }
+
+        .stat-card .value.quality {
+            padding: 4px 12px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        .stat-card .value.quality.excellent {
+            background: var(--accent-green-dim);
+            color: var(--accent-green);
+        }
+
+        .stat-card .value.quality.good {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent-blue);
+        }
+
+        .stat-card .value.quality.fair {
+            background: var(--accent-yellow-dim);
+            color: var(--accent-yellow);
+        }
+
+        .stat-card .value.quality.poor {
+            background: rgba(249, 115, 22, 0.15);
+            color: #f97316;
+        }
+
+        .stat-card .value.quality.bad {
+            background: var(--accent-red-dim);
+            color: var(--accent-red);
+        }
+
+        .stat-card .sub-value {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Main Content Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .panel-body {
+            padding: 20px;
+        }
+
+        /* Charts */
+        .chart-container {
+            height: 200px;
+            position: relative;
+        }
+
+        /* Video Player */
+        .video-container {
+            background: var(--bg-primary);
+            aspect-ratio: 16 / 9;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .video-placeholder {
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .video-placeholder svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        /* Packet Stats Grid */
+        .packet-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .packet-stat {
+            background: var(--bg-primary);
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .packet-stat .label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .packet-stat .value {
+            font-size: 20px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Media Info */
+        .media-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .media-info-section h4 {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .media-info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .media-info-item:last-child {
+            border-bottom: none;
+        }
+
+        .media-info-item .label {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .media-info-item .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+
+        /* Bottom Grid */
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .main-grid,
+            .bottom-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 16px;
+                align-items: flex-start;
+            }
+
+            .header-right {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .packet-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .media-info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <a href="/" class="back-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <div class="channel-info">
+                    <h1>
+                        <span id="channelTitle">Channel</span>
+                        <span class="site-name" id="siteName"></span>
+                    </h1>
+                    <p id="channelId"></p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div id="statusBadge" class="status-badge disconnected">
+                    <span class="status-dot"></span>
+                    <span>Disconnected</span>
+                </div>
+                <button id="toggleBtn" class="btn btn-stop" onclick="toggleChannel()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="6" y="4" width="4" height="16"/>
+                        <rect x="14" y="4" width="4" height="16"/>
+                    </svg>
+                    Stop
+                </button>
+                <a id="editBtn" href="#" class="btn btn-edit">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                    Edit
+                </a>
+                <button class="btn btn-secondary" onclick="restartFFmpeg()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6M1 20v-6h6"/>
+                        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                    </svg>
+                    Reload Player
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="label">Quality</div>
+                <div id="quality" class="value quality excellent">100%</div>
+                <div id="qualityText" class="sub-value">Excellent</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Peers</div>
+                <div id="peers" class="value">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Round Trip Time</div>
+                <div id="rtt" class="value">0 ms</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Bandwidth</div>
+                <div id="bandwidth" class="value">0 Mbps</div>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="main-grid">
+            <!-- Bandwidth Chart -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Bandwidth History</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="chart-container">
+                        <canvas id="bandwidthChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Video Player -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Live Preview</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="video-container" id="playerContainer">
+                        <div class="video-placeholder">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                                <path d="M8 21h8M12 17v4"/>
+                            </svg>
+                            <p>Waiting for stream...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Grid -->
+        <div class="bottom-grid">
+            <!-- Packet Statistics -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Packet Statistics</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="packet-grid">
+                        <div class="packet-stat">
+                            <div class="label">Received</div>
+                            <div id="received" class="value">0</div>
+                        </div>
+                        <div class="packet-stat">
+                            <div class="label">Missing</div>
+                            <div id="missing" class="value">0</div>
+                        </div>
+                        <div class="packet-stat">
+                            <div class="label">Recovered</div>
+                            <div id="recovered" class="value">0</div>
+                        </div>
+                        <div class="packet-stat">
+                            <div class="label">Lost</div>
+                            <div id="lost" class="value">0</div>
+                        </div>
+                        <div class="packet-stat">
+                            <div class="label">Reordered</div>
+                            <div id="reordered" class="value">0</div>
+                        </div>
+                        <div class="packet-stat">
+                            <div class="label">Recovered (1 Retry)</div>
+                            <div id="recovered_one_retry" class="value">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timing / IAT Chart -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Inter-Arrival Time</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="chart-container">
+                        <canvas id="iatChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Media Info Panel -->
+        <div class="panel" style="margin-top: 24px;">
+            <div class="panel-header">
+                <h2>Stream Information</h2>
+            </div>
+            <div class="panel-body">
+                <div id="mediaInfo" class="media-info-grid">
+                    <div class="video-placeholder" style="grid-column: span 2; padding: 20px;">
+                        <p>Stream information will appear when connected</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
+        const channelId = new URLSearchParams(window.location.search).get('channel');
+        
+        let channelName = '';
+        let channelStatus = 'stopped';
+        let bandwidthChart, iatChart;
+        let keepaliveInterval;
+        let isInitializingPlayer = false;
+        let lastMediaInfoFetch = 0;
+        
+        const maxDataPoints = 30;
+        const bandwidthData = [];
+        const timeLabels = [];
+
+        // Fetch hostname
+        async function loadHostname() {
+            try {
+                const response = await fetch(`${API_BASE}/system/hostname`);
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('siteName').textContent = data.hostname || '';
+                }
+            } catch (error) {
+                console.error('Error fetching hostname:', error);
+            }
+        }
+
+        // Load channel info
+        async function loadChannelInfo() {
+            try {
+                const response = await fetch(`${API_BASE}/channels/${channelId}`);
+                if (!response.ok) throw new Error('Channel not found');
+                const channel = await response.json();
+                
+                channelName = channel.name;
+                channelStatus = channel.status;
+                
+                document.getElementById('channelTitle').textContent = channel.name;
+                document.getElementById('channelId').textContent = channelId;
+                document.getElementById('editBtn').href = `edit.html?channel=${channelId}`;
+                document.title = `${channel.name} - RIST Manager`;
+                
+                updateToggleButton();
+            } catch (error) {
+                console.error('Error loading channel:', error);
+            }
+        }
+
+        // Update toggle button state
+        function updateToggleButton() {
+            const btn = document.getElementById('toggleBtn');
+            const isRunning = channelStatus === 'running';
+            
+            btn.className = `btn ${isRunning ? 'btn-stop' : 'btn-start'}`;
+            btn.innerHTML = isRunning 
+                ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                     <rect x="6" y="4" width="4" height="16"/>
+                     <rect x="14" y="4" width="4" height="16"/>
+                   </svg> Stop`
+                : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                     <polygon points="5 3 19 12 5 21 5 3"/>
+                   </svg> Start`;
+        }
+
+        // Toggle channel start/stop
+        async function toggleChannel() {
+            const btn = document.getElementById('toggleBtn');
+            const isRunning = channelStatus === 'running';
+            
+            btn.disabled = true;
+            btn.innerHTML = isRunning ? 'Stopping...' : 'Starting...';
+            
+            try {
+                const response = await fetch(
+                    `${API_BASE}/channels/${channelId}/${isRunning ? 'stop' : 'start'}`,
+                    { method: 'PUT' }
+                );
+                
+                if (!response.ok) throw new Error('Failed to toggle channel');
+                
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                await loadChannelInfo();
+            } catch (error) {
+                console.error('Error toggling channel:', error);
+                alert(`Error: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                updateToggleButton();
+            }
+        }
+
+        // Restart FFmpeg
+        async function restartFFmpeg() {
+            const btn = document.querySelector('[onclick="restartFFmpeg()"]');
+            btn.disabled = true;
+            btn.innerHTML = 'Restarting...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/channels/${channelId}/ffmpeg/restart`, {
+                    method: 'PUT'
+                });
+                
+                if (!response.ok) throw new Error('Failed to restart FFmpeg');
+                
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                initPlayer(channelName, true);
+            } catch (error) {
+                console.error('Error restarting FFmpeg:', error);
+                alert('Failed to restart FFmpeg');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 4v6h-6M1 20v-6h6"/>
+                    <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                </svg> Reload Player`;
+            }
+        }
+
+        // Keepalive
+        async function startKeepalive() {
+            try {
+                await fetch(`${API_BASE}/channels/${channelId}/keepalive`, { method: 'POST' });
+            } catch (error) {
+                console.error('Keepalive error:', error);
+            }
+        }
+
+        // Initialize video player
+        function initPlayer(name, isRunning) {
+            const container = document.getElementById('playerContainer');
+            
+            if (!isRunning) {
+                container.innerHTML = `
+                    <div class="video-placeholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="2" y="3" width="20" height="14" rx="2"/>
+                            <path d="M8 21h8M12 17v4"/>
+                        </svg>
+                        <p>Channel not running</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const url = `${window.location.protocol}//${window.location.hostname}/content/${name}/playlist.m3u8`;
+            container.innerHTML = `<video id="video" controls></video>`;
+            const video = document.getElementById('video');
+            
+            if (Hls.isSupported()) {
+                const hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = url;
+                video.addEventListener('loadedmetadata', () => video.play());
+            }
+        }
+
+        // Formatting helpers
+        function formatBytes(bytes) {
+            return (bytes / 1000000).toFixed(2) + ' Mbps';
+        }
+
+        function formatMs(seconds) {
+            return (seconds * 1000).toFixed(2) + ' ms';
+        }
+
+        function getQualityInfo(quality) {
+            if (quality >= 98) return { class: 'excellent', text: 'Excellent' };
+            if (quality >= 95) return { class: 'good', text: 'Good' };
+            if (quality >= 90) return { class: 'fair', text: 'Fair' };
+            if (quality >= 80) return { class: 'poor', text: 'Poor' };
+            return { class: 'bad', text: 'Bad' };
+        }
+
+        // Update stats display
+        function updateStats(stats) {
+            // Status badge
+            const statusBadge = document.getElementById('statusBadge');
+            if (stats.peers > 0) {
+                statusBadge.className = 'status-badge connected';
+                statusBadge.innerHTML = '<span class="status-dot"></span><span>Connected</span>';
+            } else {
+                statusBadge.className = 'status-badge disconnected';
+                statusBadge.innerHTML = '<span class="status-dot"></span><span>Disconnected</span>';
+            }
+
+            // Quality
+            const qualityInfo = getQualityInfo(stats.quality);
+            const qualityEl = document.getElementById('quality');
+            qualityEl.textContent = `${stats.quality}%`;
+            qualityEl.className = `value quality ${qualityInfo.class}`;
+            document.getElementById('qualityText').textContent = qualityInfo.text;
+
+            // Stats
+            document.getElementById('peers').textContent = stats.peers;
+            document.getElementById('rtt').textContent = formatMs(stats.timing.rtt);
+            document.getElementById('bandwidth').textContent = formatBytes(stats.bandwidth_bps);
+
+            // Packets
+            document.getElementById('received').textContent = stats.packets.received.toLocaleString();
+            document.getElementById('missing').textContent = stats.packets.missing.toLocaleString();
+            document.getElementById('recovered').textContent = stats.packets.recovered.toLocaleString();
+            document.getElementById('lost').textContent = stats.packets.lost.toLocaleString();
+            document.getElementById('reordered').textContent = stats.packets.reordered.toLocaleString();
+            document.getElementById('recovered_one_retry').textContent = stats.packets.recovered_one_retry.toLocaleString();
+
+            // Bandwidth chart
+            const now = new Date().toLocaleTimeString();
+            timeLabels.push(now);
+            bandwidthData.push(stats.bandwidth_bps / 1000000);
+
+            if (timeLabels.length > maxDataPoints) {
+                timeLabels.shift();
+                bandwidthData.shift();
+            }
+
+            bandwidthChart.update('none');
+
+            // IAT chart
+            iatChart.data.datasets[0].data = [
+                stats.timing.min_iat * 1000,
+                stats.timing.cur_iat * 1000,
+                stats.timing.max_iat * 1000
+            ];
+            iatChart.update('none');
+
+            // Initialize player if peers connected
+            if (stats.peers > 0 && !document.getElementById('video') && !isInitializingPlayer) {
+                isInitializingPlayer = true;
+                setTimeout(() => initPlayer(channelName, true), 5000);
+            }
+        }
+
+        // Fetch media info
+        async function fetchMediaInfo() {
+            const now = Date.now();
+            if (now - lastMediaInfoFetch < 60000) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/channels/${channelId}/media-info`);
+                if (!response.ok) throw new Error('Failed to fetch');
+                const mediaInfo = await response.json();
+
+                const videoStream = mediaInfo.streams.find(s => s.codec_type === 'video');
+                const audioStream = mediaInfo.streams.find(s => s.codec_type === 'audio');
+
+                if (videoStream || audioStream) {
+                    const container = document.getElementById('mediaInfo');
+                    container.innerHTML = `
+                        <div class="media-info-section">
+                            <h4>Video</h4>
+                            ${videoStream ? `
+                                <div class="media-info-item">
+                                    <span class="label">Codec</span>
+                                    <span class="value">${videoStream.codec_name.toUpperCase()}</span>
+                                </div>
+                                <div class="media-info-item">
+                                    <span class="label">Resolution</span>
+                                    <span class="value">${videoStream.width}x${videoStream.height}</span>
+                                </div>
+                                <div class="media-info-item">
+                                    <span class="label">Frame Rate</span>
+                                    <span class="value">${videoStream.avg_frame_rate}</span>
+                                </div>
+                                <div class="media-info-item">
+                                    <span class="label">Profile</span>
+                                    <span class="value">${videoStream.profile || 'N/A'}</span>
+                                </div>
+                            ` : '<p style="color: var(--text-muted);">No video stream</p>'}
+                        </div>
+                        <div class="media-info-section">
+                            <h4>Audio</h4>
+                            ${audioStream ? `
+                                <div class="media-info-item">
+                                    <span class="label">Codec</span>
+                                    <span class="value">${audioStream.codec_name.toUpperCase()}</span>
+                                </div>
+                                <div class="media-info-item">
+                                    <span class="label">Sample Rate</span>
+                                    <span class="value">${audioStream.sample_rate} Hz</span>
+                                </div>
+                                <div class="media-info-item">
+                                    <span class="label">Channels</span>
+                                    <span class="value">${audioStream.channel_layout || audioStream.channels}</span>
+                                </div>
+                                <div class="media-info-item">
+                                    <span class="label">Bit Rate</span>
+                                    <span class="value">${audioStream.bit_rate ? Math.round(audioStream.bit_rate / 1000) + ' kbps' : 'N/A'}</span>
+                                </div>
+                            ` : '<p style="color: var(--text-muted);">No audio stream</p>'}
+                        </div>
+                    `;
+                }
+
+                lastMediaInfoFetch = now;
+            } catch (error) {
+                console.error('Error fetching media info:', error);
+            }
+        }
+
+        // Initialize charts
+        function initCharts() {
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(42, 58, 77, 0.5)' },
+                        ticks: { color: '#5a6a7a', maxTicksLimit: 6 }
+                    },
+                    y: {
+                        grid: { color: 'rgba(42, 58, 77, 0.5)' },
+                        ticks: { color: '#5a6a7a' },
+                        beginAtZero: true
+                    }
+                }
+            };
+
+            bandwidthChart = new Chart(document.getElementById('bandwidthChart'), {
+                type: 'line',
+                data: {
+                    labels: timeLabels,
+                    datasets: [{
+                        data: bandwidthData,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        ...chartOptions.scales,
+                        y: {
+                            ...chartOptions.scales.y,
+                            title: { display: true, text: 'Mbps', color: '#5a6a7a' }
+                        }
+                    }
+                }
+            });
+
+            iatChart = new Chart(document.getElementById('iatChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['Min', 'Current', 'Max'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: ['rgba(59, 130, 246, 0.6)', 'rgba(59, 130, 246, 0.8)', 'rgba(59, 130, 246, 1)'],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        ...chartOptions.scales,
+                        y: {
+                            ...chartOptions.scales.y,
+                            title: { display: true, text: 'ms', color: '#5a6a7a' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Fetch metrics
+        async function updateMetrics() {
+            try {
+                const response = await fetch(`${API_BASE}/channels/${channelId}/metrics`, {
+                    cache: 'no-store'
+                });
+                if (!response.ok) throw new Error('Failed to fetch metrics');
+                updateStats(await response.json());
+            } catch (error) {
+                console.error('Error fetching metrics:', error);
+            }
+        }
+
+        // Initialize
+        async function init() {
+            if (!channelId) {
+                window.location.href = '/';
+                return;
+            }
+
+            await loadHostname();
+            await loadChannelInfo();
+            initCharts();
+            
+            await startKeepalive();
+            keepaliveInterval = setInterval(startKeepalive, 30000);
+            
+            await updateMetrics();
+            setInterval(updateMetrics, 1000);
+            
+            fetchMediaInfo();
+            setInterval(fetchMediaInfo, 60000);
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+
+        window.addEventListener('beforeunload', () => {
+            if (keepaliveInterval) clearInterval(keepaliveInterval);
+        });
+    </script>
+</body>
+</html>
