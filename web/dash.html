@@ -663,17 +663,18 @@
             Object.entries(networkData).forEach(([iface, stats]) => {
                 const card = document.createElement('div');
                 card.className = 'network-card';
+                // stats.recv and stats.sent are already in bits per second
                 card.innerHTML = `
                     <div class="interface-name">${iface}</div>
                     <div class="network-stats">
                         <div class="network-stat rx">
                             <div class="label">Received</div>
-                            <div class="value">${formatBytesPerSec(stats.recv / 8)}</div>
+                            <div class="value">${formatBits(stats.recv)}</div>
                             <div class="total">Total: ${formatBytes(stats.total_recv)}</div>
                         </div>
                         <div class="network-stat tx">
                             <div class="label">Sent</div>
-                            <div class="value">${formatBytesPerSec(stats.sent / 8)}</div>
+                            <div class="value">${formatBits(stats.sent)}</div>
                             <div class="total">Total: ${formatBytes(stats.total_sent)}</div>
                         </div>
                     </div>
