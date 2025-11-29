@@ -896,7 +896,9 @@ Endpoint = vpn.example.com:51820"></textarea>
                     credentials: 'include'
                 });
                 if (ifaceResponse.ok) {
-                    allInterfaces = await ifaceResponse.json();
+                    const ifaceData = await ifaceResponse.json();
+                    // The endpoint returns { interfaces: [...] }
+                    allInterfaces = ifaceData.interfaces || [];
                 }
                 
                 // Load current multicast config
