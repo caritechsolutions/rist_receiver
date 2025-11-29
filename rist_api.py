@@ -26,15 +26,27 @@ previous_network_timestamp = 0
 channel_monitors: Dict[str, asyncio.Task] = {}
 channel_last_active: Dict[str, float] = {}
 
-# Comprehensive Logging Configuration
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("/var/log/rist-api.log"),
-        logging.StreamHandler()
-    ]
+# Logging Configuration with rotation
+from logging.handlers import RotatingFileHandler
+
+log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# File handler with rotation - max 10MB, keep 3 backups
+file_handler = RotatingFileHandler(
+    "/var/log/rist-api.log",
+    maxBytes=10*1024*1024,  # 10MB
+    backupCount=3
 )
+file_handler.setFormatter(log_formatter)
+file_handler.setLevel(logging.INFO)
+
+# Console handler - only warnings and above
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(log_formatter)
+console_handler.setLevel(logging.WARNING)
+
+# Configure root logger
+logging.basicConfig(level=logging.INFO, handlers=[file_handler, console_handler])
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="RIST Receiver API")
@@ -322,7 +334,7 @@ def get_cached_metrics(channel_id: str, metrics_port: int, cache_timeout: int = 
     
     # Fetch new metrics
     try:
-        logger.info(f"Fetching metrics for channel {channel_id} from port {metrics_port}")
+        logger.debug(f"Fetching metrics for channel {channel_id} from port {metrics_port}")
         response = requests.get(f"http://localhost:{metrics_port}/metrics", timeout=2)
         
         if response.status_code != 200:
