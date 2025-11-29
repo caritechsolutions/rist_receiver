@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Channel - RIST Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #111820;
+            --bg-tertiary: #1a2332;
+            --bg-hover: #232d3f;
+            --border-color: #2a3a4d;
+            --border-highlight: #3d5a80;
+            --text-primary: #e8eef4;
+            --text-secondary: #8899a8;
+            --text-muted: #5a6a7a;
+            --accent-blue: #3b82f6;
+            --accent-blue-dim: #2563eb;
+            --accent-green: #10b981;
+            --accent-green-dim: rgba(16, 185, 129, 0.15);
+            --accent-red: #ef4444;
+            --accent-red-dim: rgba(239, 68, 68, 0.15);
+            --accent-yellow: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .app-container {
+            position: relative;
+            z-index: 1;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-color: var(--border-highlight);
+        }
+
+        .back-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .header-info h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-info .site-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--accent-blue);
+        }
+
+        .header-info .site-name::before {
+            content: '//';
+            color: var(--text-muted);
+            margin-right: 4px;
+        }
+
+        .header-info p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Form */
+        .form-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            overflow: hidden;
+        }
+
+        .form-section {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .form-section:last-child {
+            border-bottom: none;
+        }
+
+        .form-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-section-title svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group.full-width {
+            grid-column: span 2;
+        }
+
+        .form-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            padding: 12px 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            background: var(--bg-tertiary);
+        }
+
+        .form-group input::placeholder,
+        .form-group textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+
+        .form-group select {
+            cursor: pointer;
+        }
+
+        .form-group .hint {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .form-group .hint code {
+            background: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+        }
+
+        /* Form Actions */
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 20px 24px;
+            background: var(--bg-primary);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            text-decoration: none;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-blue-dim);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+            border-color: var(--border-highlight);
+        }
+
+        .btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* URL Builder Preview */
+        .url-preview {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--accent-blue);
+            word-break: break-all;
+        }
+
+        .url-preview .protocol {
+            color: var(--accent-green);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-group.full-width {
+                grid-column: span 1;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .form-actions .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <a href="/" class="back-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div class="header-info">
+                <h1>
+                    Add Channel
+                    <span class="site-name" id="siteName"></span>
+                </h1>
+                <p>Configure a new RIST receiver channel</p>
+            </div>
+        </header>
+
+        <!-- Form -->
+        <form id="channelForm" class="form-panel">
+            <!-- Basic Info -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2"/>
+                        <path d="M8 21h8M12 17v4"/>
+                    </svg>
+                    Basic Information
+                </div>
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="name">Channel Name</label>
+                        <input type="text" id="name" required placeholder="e.g., BBC World News">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Configuration -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                    Input Configuration
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="ip">Source IP Address</label>
+                        <input type="text" id="ip" required pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" placeholder="192.168.1.100">
+                    </div>
+                    <div class="form-group">
+                        <label for="port">Source Port</label>
+                        <input type="number" id="port" required min="1" max="65535" placeholder="5000">
+                    </div>
+                    <div class="form-group">
+                        <label for="virt_port">Virtual Port</label>
+                        <input type="number" id="virt_port" required min="1" max="65535" value="4602">
+                        <span class="hint">Virtual destination port for RIST</span>
+                    </div>
+                    <div class="form-group">
+                        <label>Input URL Preview</label>
+                        <div class="url-preview" id="inputPreview">
+                            <span class="protocol">rist://</span><span id="inputUrl">...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Output Configuration -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M5 12l7-7M5 12l7 7"/>
+                    </svg>
+                    Output Configuration
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="multicast_ip">Multicast IP</label>
+                        <input type="text" id="multicast_ip" required pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" value="224.2.2.2">
+                    </div>
+                    <div class="form-group">
+                        <label for="multicast_port">Multicast Port</label>
+                        <input type="number" id="multicast_port" required min="1" max="65535" value="10000">
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Output URL Preview</label>
+                        <div class="url-preview" id="outputPreview">
+                            <span class="protocol">udp://</span><span id="outputUrl">224.2.2.2:10000</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIST Settings -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/>
+                    </svg>
+                    RIST Settings
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="profile">Profile</label>
+                        <select id="profile">
+                            <option value="0">Simple (0)</option>
+                            <option value="1" selected>Main (1)</option>
+                            <option value="2">Advanced (2)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="buffer">Buffer Size (ms)</label>
+                        <input type="number" id="buffer" required min="0" value="1000">
+                    </div>
+                    <div class="form-group">
+                        <label for="encryption_type">Encryption</label>
+                        <select id="encryption_type">
+                            <option value="">None</option>
+                            <option value="128">AES-128</option>
+                            <option value="256">AES-256</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="secret">Encryption Secret</label>
+                        <input type="password" id="secret" placeholder="Enter passphrase">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backup Sources -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                    </svg>
+                    Backup Sources (High Availability)
+                </div>
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="backup_sources">Backup Source URLs</label>
+                        <textarea id="backup_sources" placeholder="Enter backup source URLs, one per line&#10;e.g., rist://backup1.example.com:5000&#10;      rist://backup2.example.com:5000"></textarea>
+                        <span class="hint">Optional. Add failover sources for high availability. Format: <code>rist://ip:port</code></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="form-actions">
+                <a href="/" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                    Create Channel
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
+
+        // Fetch hostname
+        async function loadHostname() {
+            try {
+                const response = await fetch(`${API_BASE}/system/hostname`);
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('siteName').textContent = data.hostname || '';
+                    document.title = `Add Channel - RIST Manager // ${data.hostname}`;
+                }
+            } catch (error) {
+                console.error('Error fetching hostname:', error);
+            }
+        }
+
+        // Update URL previews
+        function updatePreviews() {
+            const ip = document.getElementById('ip').value || '...';
+            const port = document.getElementById('port').value || '...';
+            document.getElementById('inputUrl').textContent = `${ip}:${port}`;
+
+            const mcastIp = document.getElementById('multicast_ip').value || '224.2.2.2';
+            const mcastPort = document.getElementById('multicast_port').value || '10000';
+            document.getElementById('outputUrl').textContent = `${mcastIp}:${mcastPort}`;
+        }
+
+        // Get next channel ID
+        async function getNextChannelId() {
+            try {
+                const response = await fetch(`${API_BASE}/channels`);
+                const channels = await response.json();
+                
+                let maxNum = 0;
+                Object.keys(channels).forEach(channelId => {
+                    if (channelId.startsWith('channel')) {
+                        const num = parseInt(channelId.replace('channel', ''));
+                        if (!isNaN(num) && num > maxNum) maxNum = num;
+                    }
+                });
+                
+                return `channel${maxNum + 1}`;
+            } catch (error) {
+                console.error('Error getting next channel ID:', error);
+                return 'channel1';
+            }
+        }
+
+        // Get next metrics port
+        async function getNextMetricsPort() {
+            try {
+                const response = await fetch(`${API_BASE}/channels`);
+                const channels = await response.json();
+                
+                let maxPort = 9200;
+                Object.values(channels).forEach(channel => {
+                    if (channel.metrics_port > maxPort) maxPort = channel.metrics_port;
+                });
+                
+                return maxPort + 1;
+            } catch (error) {
+                console.error('Error getting next metrics port:', error);
+                return 9201;
+            }
+        }
+
+        // Form submission
+        document.getElementById('channelForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Creating...';
+            
+            try {
+                const channelId = await getNextChannelId();
+                const metricsPort = await getNextMetricsPort();
+                
+                const formData = {
+                    name: document.getElementById('name').value,
+                    enabled: true,
+                    input: `rist://${document.getElementById('ip').value}:${document.getElementById('port').value}`,
+                    output: `udp://${document.getElementById('multicast_ip').value}:${document.getElementById('multicast_port').value}`,
+                    settings: {
+                        profile: parseInt(document.getElementById('profile').value),
+                        virt_src_port: parseInt(document.getElementById('virt_port').value),
+                        buffer: parseInt(document.getElementById('buffer').value),
+                        encryption_type: document.getElementById('encryption_type').value ? 
+                            parseInt(document.getElementById('encryption_type').value) : null,
+                        secret: document.getElementById('secret').value || null
+                    },
+                    metrics_port: metricsPort,
+                    status: 'stopped',
+                    process_id: null,
+                    last_error: null
+                };
+
+                // Create channel
+                const channelResponse = await fetch(`${API_BASE}/channels/${channelId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (!channelResponse.ok) {
+                    const errorData = await channelResponse.json();
+                    throw new Error(errorData.detail || 'Failed to create channel');
+                }
+
+                // Process backup sources
+                const backupSourcesText = document.getElementById('backup_sources').value.trim();
+                if (backupSourcesText) {
+                    const backupSources = backupSourcesText.split('\n')
+                        .map(source => source.trim())
+                        .filter(source => source !== '');
+
+                    if (backupSources.length > 0) {
+                        const backupResponse = await fetch(`${API_BASE}/channels/${channelId}/backup-sources`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(backupSources)
+                        });
+
+                        if (!backupResponse.ok) {
+                            console.error('Failed to save backup sources');
+                        }
+                    }
+                }
+                
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error creating channel: ' + error.message);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                    Create Channel
+                `;
+            }
+        });
+
+        // Event listeners for preview updates
+        ['ip', 'port', 'multicast_ip', 'multicast_port'].forEach(id => {
+            document.getElementById(id).addEventListener('input', updatePreviews);
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHostname();
+            updatePreviews();
+        });
+    </script>
+</body>
+</html>
