@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Channel - RIST Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #111820;
+            --bg-tertiary: #1a2332;
+            --bg-hover: #232d3f;
+            --border-color: #2a3a4d;
+            --border-highlight: #3d5a80;
+            --text-primary: #e8eef4;
+            --text-secondary: #8899a8;
+            --text-muted: #5a6a7a;
+            --accent-blue: #3b82f6;
+            --accent-blue-dim: #2563eb;
+            --accent-green: #10b981;
+            --accent-green-dim: rgba(16, 185, 129, 0.15);
+            --accent-red: #ef4444;
+            --accent-red-dim: rgba(239, 68, 68, 0.15);
+            --accent-yellow: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .app-container {
+            position: relative;
+            z-index: 1;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-color: var(--border-highlight);
+        }
+
+        .back-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .header-info h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-info .site-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--accent-blue);
+        }
+
+        .header-info .site-name::before {
+            content: '//';
+            color: var(--text-muted);
+            margin-right: 4px;
+        }
+
+        .header-info p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Form */
+        .form-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            overflow: hidden;
+        }
+
+        .form-section {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .form-section:last-child {
+            border-bottom: none;
+        }
+
+        .form-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-section-title svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group.full-width {
+            grid-column: span 2;
+        }
+
+        .form-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            padding: 12px 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            background: var(--bg-tertiary);
+        }
+
+        .form-group input::placeholder,
+        .form-group textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+
+        .form-group select {
+            cursor: pointer;
+        }
+
+        .form-group .hint {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .form-group .hint code {
+            background: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+        }
+
+        /* Form Actions */
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 20px 24px;
+            background: var(--bg-primary);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            text-decoration: none;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-blue-dim);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+            border-color: var(--border-highlight);
+        }
+
+        .btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-secondary);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-group.full-width {
+                grid-column: span 1;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .form-actions .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <a href="/" class="back-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div class="header-info">
+                <h1>
+                    Edit Channel
+                    <span class="site-name" id="siteName"></span>
+                </h1>
+                <p id="channelId"></p>
+            </div>
+        </header>
+
+        <!-- Form -->
+        <form id="editForm" class="form-panel">
+            <!-- Basic Info -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2"/>
+                        <path d="M8 21h8M12 17v4"/>
+                    </svg>
+                    Basic Information
+                </div>
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="name">Channel Name</label>
+                        <input type="text" id="name" required placeholder="e.g., BBC World News">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input/Output URLs -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                    Stream URLs
+                </div>
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="input">Input URL</label>
+                        <input type="text" id="input" required placeholder="rist://192.168.1.100:5000">
+                        <span class="hint">Format: <code>rist://ip:port</code></span>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="output">Output URL</label>
+                        <input type="text" id="output" required placeholder="udp://224.2.2.2:10000">
+                        <span class="hint">Format: <code>udp://multicast_ip:port</code></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="metrics_port">Metrics Port</label>
+                        <input type="number" id="metrics_port" required min="1024" max="65535">
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIST Settings -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/>
+                    </svg>
+                    RIST Settings
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="profile">Profile</label>
+                        <select id="profile">
+                            <option value="0">Simple (0)</option>
+                            <option value="1">Main (1)</option>
+                            <option value="2">Advanced (2)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="virt_src_port">Virtual Source Port</label>
+                        <input type="number" id="virt_src_port" min="1" max="65535">
+                    </div>
+                    <div class="form-group">
+                        <label for="buffer">Buffer Size (ms)</label>
+                        <input type="number" id="buffer" required min="0" value="500">
+                    </div>
+                    <div class="form-group">
+                        <label for="encryption_type">Encryption</label>
+                        <select id="encryption_type">
+                            <option value="">None</option>
+                            <option value="128">AES-128</option>
+                            <option value="256">AES-256</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="secret">Encryption Secret</label>
+                        <input type="password" id="secret" placeholder="Enter passphrase (leave empty to keep current)">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backup Sources -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                    </svg>
+                    Backup Sources (High Availability)
+                </div>
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="backup_sources">Backup Source URLs</label>
+                        <textarea id="backup_sources" placeholder="Enter backup source URLs, one per line&#10;e.g., rist://backup1.example.com:5000"></textarea>
+                        <span class="hint">Optional. Add failover sources for high availability. Format: <code>rist://ip:port</code></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="form-actions">
+                <a href="/" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                    </svg>
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
+        const channelId = new URLSearchParams(window.location.search).get('channel');
+
+        // Fetch hostname
+        async function loadHostname() {
+            try {
+                const response = await fetch(`${API_BASE}/system/hostname`);
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('siteName').textContent = data.hostname || '';
+                }
+            } catch (error) {
+                console.error('Error fetching hostname:', error);
+            }
+        }
+
+        // Load channel data
+        async function loadChannel() {
+            if (!channelId) {
+                window.location.href = '/';
+                return;
+            }
+
+            try {
+                const [channelResponse, backupSourcesResponse] = await Promise.all([
+                    fetch(`${API_BASE}/channels/${channelId}`),
+                    fetch(`${API_BASE}/channels/${channelId}/backup-sources`)
+                ]);
+
+                if (!channelResponse.ok) {
+                    throw new Error('Channel not found');
+                }
+                
+                const channel = await channelResponse.json();
+                const backupData = await backupSourcesResponse.json();
+                
+                // Update header
+                document.getElementById('channelId').textContent = channelId;
+                document.title = `Edit ${channel.name} - RIST Manager`;
+
+                // Populate form
+                document.getElementById('name').value = channel.name;
+                document.getElementById('input').value = channel.input;
+                document.getElementById('output').value = channel.output;
+                document.getElementById('metrics_port').value = channel.metrics_port;
+                
+                // RIST settings
+                document.getElementById('profile').value = channel.settings.profile;
+                document.getElementById('virt_src_port').value = channel.settings.virt_src_port || '';
+                document.getElementById('buffer').value = channel.settings.buffer;
+                document.getElementById('encryption_type').value = channel.settings.encryption_type || '';
+                // Don't populate secret - leave blank for security
+                
+                // Backup sources
+                if (backupData.backup_sources && backupData.backup_sources.length > 0) {
+                    document.getElementById('backup_sources').value = backupData.backup_sources.join('\n');
+                }
+                
+            } catch (error) {
+                console.error('Error loading channel:', error);
+                alert('Error loading channel data');
+                window.location.href = '/';
+            }
+        }
+
+        // Form submission
+        document.getElementById('editForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Saving...';
+            
+            try {
+                const formData = {
+                    name: document.getElementById('name').value,
+                    enabled: true,
+                    input: document.getElementById('input').value,
+                    output: document.getElementById('output').value,
+                    metrics_port: parseInt(document.getElementById('metrics_port').value),
+                    settings: {
+                        profile: parseInt(document.getElementById('profile').value),
+                        virt_src_port: document.getElementById('virt_src_port').value ? 
+                            parseInt(document.getElementById('virt_src_port').value) : null,
+                        buffer: parseInt(document.getElementById('buffer').value),
+                        encryption_type: document.getElementById('encryption_type').value ? 
+                            parseInt(document.getElementById('encryption_type').value) : null,
+                        secret: document.getElementById('secret').value || null
+                    },
+                    status: 'stopped'
+                };
+
+                // Update channel
+                const channelResponse = await fetch(`${API_BASE}/channels/${channelId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (!channelResponse.ok) {
+                    const errorData = await channelResponse.json();
+                    throw new Error(errorData.detail || 'Failed to update channel');
+                }
+
+                // Process backup sources
+                const backupSourcesText = document.getElementById('backup_sources').value.trim();
+                const backupSources = backupSourcesText ? 
+                    backupSourcesText.split('\n')
+                        .map(source => source.trim())
+                        .filter(source => source !== '') 
+                    : [];
+
+                const backupResponse = await fetch(`${API_BASE}/channels/${channelId}/backup-sources`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(backupSources)
+                });
+
+                if (!backupResponse.ok) {
+                    console.error('Failed to update backup sources');
+                }
+                
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error updating channel: ' + error.message);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                    </svg>
+                    Save Changes
+                `;
+            }
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHostname();
+            loadChannel();
+        });
+    </script>
+</body>
+</html>
