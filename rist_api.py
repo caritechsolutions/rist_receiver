@@ -17,6 +17,7 @@ import GPUtil
 import asyncio
 import uvicorn
 import socket
+import netifaces
 
 
 # Global variable to store previous network stats for bandwidth calculation
@@ -523,6 +524,211 @@ def startup_event():
 def get_system_hostname():
     """Get the system hostname"""
     return {"hostname": socket.gethostname()}
+
+
+@app.get("/system/network-interfaces")
+def get_network_interfaces():
+    """Get detailed information about all network interfaces"""
+    import netifaces
+    
+    interfaces = []
+    
+    for iface in netifaces.interfaces():
+        iface_info = {
+            "name": iface,
+            "status": "down",
+            "ipv4": [],
+            "ipv6": [],
+            "mac": None,
+            "speed": None,
+            "mtu": None
+        }
+        
+        try:
+            # Get addresses
+            addrs = netifaces.ifaddresses(iface)
+            
+            # IPv4 addresses
+            if netifaces.AF_INET in addrs:
+                for addr in addrs[netifaces.AF_INET]:
+                    iface_info["ipv4"].append({
+                        "address": addr.get("addr"),
+                        "netmask": addr.get("netmask"),
+                        "broadcast": addr.get("broadcast")
+                    })
+            
+            # IPv6 addresses
+            if netifaces.AF_INET6 in addrs:
+                for addr in addrs[netifaces.AF_INET6]:
+                    # Skip link-local addresses for cleaner display
+                    if not addr.get("addr", "").startswith("fe80"):
+                        iface_info["ipv6"].append({
+                            "address": addr.get("addr"),
+                            "netmask": addr.get("netmask")
+                        })
+            
+            # MAC address
+            if netifaces.AF_LINK in addrs:
+                for addr in addrs[netifaces.AF_LINK]:
+                    if addr.get("addr"):
+                        iface_info["mac"] = addr.get("addr")
+                        break
+            
+            # Check if interface is up using /sys/class/net
+            try:
+                with open(f"/sys/class/net/{iface}/operstate", "r") as f:
+                    state = f.read().strip()
+                    iface_info["status"] = "up" if state == "up" else "down"
+            except:
+                # If we have an IP, assume it's up
+                if iface_info["ipv4"] or iface_info["ipv6"]:
+                    iface_info["status"] = "up"
+            
+            # Get speed (only for physical interfaces)
+            try:
+                with open(f"/sys/class/net/{iface}/speed", "r") as f:
+                    speed = int(f.read().strip())
+                    if speed > 0:
+                        iface_info["speed"] = speed  # in Mbps
+            except:
+                pass
+            
+            # Get MTU
+            try:
+                with open(f"/sys/class/net/{iface}/mtu", "r") as f:
+                    iface_info["mtu"] = int(f.read().strip())
+            except:
+                pass
+                
+        except Exception as e:
+            logger.error(f"Error getting interface {iface} info: {e}")
+        
+        interfaces.append(iface_info)
+    
+    # Sort: physical interfaces first, then virtual, loopback last
+    def sort_key(iface):
+        name = iface["name"]
+        if name == "lo":
+            return (3, name)
+        elif name.startswith(("eth", "en", "eno", "ens")):
+            return (0, name)
+        elif name.startswith("wg"):
+            return (1, name)
+        else:
+            return (2, name)
+    
+    interfaces.sort(key=sort_key)
+    
+    return {"interfaces": interfaces}
+
+
+@app.get("/system/wireguard")
+def get_wireguard_config():
+    """Get WireGuard configuration and status"""
+    config_path = "/etc/wireguard/wg0.conf"
+    
+    # Get config file contents
+    config_content = ""
+    config_exists = False
+    if os.path.exists(config_path):
+        config_exists = True
+        try:
+            with open(config_path, "r") as f:
+                config_content = f.read()
+        except Exception as e:
+            logger.error(f"Failed to read WireGuard config: {e}")
+    
+    # Get service status
+    service_status = "inactive"
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-active", "wg-quick@wg0"],
+            capture_output=True,
+            text=True
+        )
+        service_status = result.stdout.strip()
+    except:
+        pass
+    
+    # Get service enabled status
+    service_enabled = False
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-enabled", "wg-quick@wg0"],
+            capture_output=True,
+            text=True
+        )
+        service_enabled = result.stdout.strip() == "enabled"
+    except:
+        pass
+    
+    # Get WireGuard interface status if active
+    wg_status = None
+    if service_status == "active":
+        try:
+            result = subprocess.run(
+                ["wg", "show", "wg0"],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0:
+                wg_status = result.stdout
+        except:
+            pass
+    
+    return {
+        "config_exists": config_exists,
+        "config_content": config_content,
+        "service_status": service_status,
+        "service_enabled": service_enabled,
+        "wg_status": wg_status
+    }
+
+
+@app.post("/system/wireguard")
+def save_wireguard_config(config: dict = Body(...)):
+    """Save WireGuard configuration and restart service"""
+    config_path = "/etc/wireguard/wg0.conf"
+    config_content = config.get("config_content", "")
+    
+    if not config_content.strip():
+        raise HTTPException(status_code=400, detail="Configuration cannot be empty")
+    
+    # Basic validation - check for required sections
+    if "[Interface]" not in config_content:
+        raise HTTPException(status_code=400, detail="Invalid config: missing [Interface] section")
+    
+    try:
+        # Ensure directory exists
+        os.makedirs("/etc/wireguard", exist_ok=True)
+        
+        # Stop WireGuard if running
+        subprocess.run(["systemctl", "stop", "wg-quick@wg0"], capture_output=True)
+        
+        # Write config file
+        with open(config_path, "w") as f:
+            f.write(config_content)
+        
+        # Set proper permissions (important for WireGuard)
+        os.chmod(config_path, 0o600)
+        
+        # Enable and start WireGuard
+        subprocess.run(["systemctl", "enable", "wg-quick@wg0"], check=True)
+        subprocess.run(["systemctl", "start", "wg-quick@wg0"], check=True)
+        
+        logger.info("WireGuard configuration saved and service restarted")
+        
+        return {
+            "status": "success",
+            "message": "WireGuard configuration saved and service started"
+        }
+        
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to restart WireGuard: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start WireGuard service: {e.stderr}")
+    except Exception as e:
+        logger.error(f"Failed to save WireGuard config: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save configuration: {str(e)}")
 
 
 @app.get("/channels")
