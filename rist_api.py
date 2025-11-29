@@ -476,9 +476,14 @@ def get_system_health_metrics(cache_timeout: int = 1):
         logger.error(traceback.format_exc())
         return {}
 
+import threading
+
+# Lock to prevent concurrent metrics fetches to the same port
+metrics_fetch_lock = threading.Lock()
+
 def get_cached_metrics(channel_id: str, metrics_port: int, cache_timeout: int = 1):
     """
-    Retrieve metrics with a simple caching mechanism
+    Retrieve metrics with a simple caching mechanism and thread-safe fetching
     """
     current_time = time.time()
     
@@ -487,27 +492,34 @@ def get_cached_metrics(channel_id: str, metrics_port: int, cache_timeout: int = 
         current_time - metrics_cache[channel_id]['timestamp'] < cache_timeout):
         return metrics_cache[channel_id]['data']
     
-    # Fetch new metrics
-    try:
-        logger.debug(f"Fetching metrics for channel {channel_id} from port {metrics_port}")
-        response = requests.get(f"http://localhost:{metrics_port}/metrics", timeout=2)
+    # Use lock to prevent concurrent requests to the same metrics endpoint
+    with metrics_fetch_lock:
+        # Check cache again in case another thread just updated it
+        if (channel_id in metrics_cache and 
+            current_time - metrics_cache[channel_id]['timestamp'] < cache_timeout):
+            return metrics_cache[channel_id]['data']
         
-        if response.status_code != 200:
-            logger.error(f"Metrics endpoint returned status {response.status_code}")
-            return parse_prometheus_metrics("")
+        # Fetch new metrics
+        try:
+            logger.debug(f"Fetching metrics for channel {channel_id} from port {metrics_port}")
+            response = requests.get(f"http://localhost:{metrics_port}/metrics", timeout=2)
+            
+            if response.status_code != 200:
+                logger.error(f"Metrics endpoint returned status {response.status_code}")
+                return parse_prometheus_metrics("")
+            
+            metrics = parse_prometheus_metrics(response.text)
+            
+            # Cache the result
+            metrics_cache[channel_id] = {
+                'timestamp': time.time(),
+                'data': metrics
+            }
+            
+            return metrics
         
-        metrics = parse_prometheus_metrics(response.text)
-        
-        # Cache the result
-        metrics_cache[channel_id] = {
-            'timestamp': current_time,
-            'data': metrics
-        }
-        
-        return metrics
-    
-    except requests.RequestException as e:
-        logger.error(f"Error fetching metrics for channel {channel_id}: {e}")
+        except requests.RequestException as e:
+            logger.error(f"Error fetching metrics for channel {channel_id}: {e}")
         return parse_prometheus_metrics("")
 
 def reload_systemd():
@@ -627,6 +639,8 @@ def get_channel_status(channel_id: str) -> tuple:
         )
         service_state = result.stdout.strip()
         
+        logger.debug(f"Channel {channel_id} systemd state: {service_state}")
+        
         if service_state == "failed":
             # Get failure reason from systemd
             reason_result = subprocess.run(
@@ -644,30 +658,26 @@ def get_channel_status(channel_id: str) -> tuple:
             return ("error", error_msg)
         
         elif service_state == "active":
-            # Service is running, now check stream health
+            # Service is running, now check stream health using CACHED metrics
             config = load_config()
             if channel_id in config["channels"]:
                 channel = config["channels"][channel_id]
                 metrics_port = channel.get("metrics_port")
                 
                 if metrics_port:
-                    try:
-                        # Quick metrics check (short timeout)
-                        response = requests.get(
-                            f"http://localhost:{metrics_port}/metrics", 
-                            timeout=2
-                        )
-                        if response.status_code == 200:
-                            metrics = parse_prometheus_metrics(response.text)
-                            
-                            # Check for unhealthy stream
-                            if metrics.get("peers", 0) == 0:
-                                return ("error", "No peers connected")
-                            elif metrics.get("quality", 100) < 50:
-                                return ("error", f"Poor stream quality: {metrics.get('quality', 0):.0f}%")
-                    except requests.RequestException:
-                        # Can't reach metrics endpoint - might still be starting
-                        pass
+                    # Use the shared cached metrics - don't make a separate request
+                    metrics = get_cached_metrics(channel_id, metrics_port, cache_timeout=2)
+                    
+                    peers = metrics.get("peers", 0)
+                    quality = metrics.get("quality", 100)
+                    
+                    logger.debug(f"Channel {channel_id} cached metrics - peers: {peers}, quality: {quality}")
+                    
+                    # Check for unhealthy stream
+                    if peers == 0:
+                        return ("error", "No peers connected")
+                    elif quality < 50:
+                        return ("error", f"Poor stream quality: {quality:.0f}%")
             
             return ("running", None)
         
