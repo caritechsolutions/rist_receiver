@@ -600,6 +600,8 @@ def start_channel(channel_id: str):
         raise HTTPException(status_code=404)
     
     try:
+        # Enable service so it auto-starts on reboot
+        subprocess.run(["systemctl", "enable", f"rist-channel-{channel_id}.service"], check=True)
         subprocess.run(["systemctl", "start", f"rist-channel-{channel_id}.service"], check=True)
         channel_keepalive(channel_id)  # This will start FFmpeg if needed
         return {"status": "started"}
@@ -616,6 +618,8 @@ def stop_channel(channel_id: str):
     try:
         # FFmpeg will stop automatically due to BindsTo
         subprocess.run(["systemctl", "stop", f"rist-channel-{channel_id}.service"], check=True)
+        # Disable service so it won't auto-start on reboot
+        subprocess.run(["systemctl", "disable", f"rist-channel-{channel_id}.service"], check=True)
         return {"status": "stopped"}
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=f"Failed to stop services: {e.stderr}")
