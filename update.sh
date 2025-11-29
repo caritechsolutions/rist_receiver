@@ -3,6 +3,11 @@
 # RIST Receiver Update Script
 # This script updates only the code files (API, web interface)
 # It preserves: configs, services, and channel data
+#
+# Usage:
+#   Interactive:  ./update.sh
+#   Auto-confirm: ./update.sh -y
+#   Via curl:     curl -sSL "https://raw.githubusercontent.com/.../update.sh" | sudo bash -s -- -y
 
 set -e
 
@@ -11,6 +16,15 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
+
+# Parse arguments
+AUTO_CONFIRM=false
+while getopts "y" opt; do
+    case $opt in
+        y) AUTO_CONFIRM=true ;;
+        *) ;;
+    esac
+done
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}   RIST Receiver Update Script${NC}"
@@ -62,7 +76,7 @@ download_latest() {
     cd "$TEMP_DIR"
     
     # Clone the repo
-    git clone https://github.com/caritechsolutions/rist_receiver.git
+    git clone --quiet https://github.com/caritechsolutions/rist_receiver.git
     
     echo -e "${GREEN}Download complete.${NC}"
 }
@@ -189,11 +203,20 @@ main() {
     
     show_plan
     
-    # Prompt for confirmation
-    read -p "Do you want to continue with the update? (y/N): " confirm
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-        echo -e "${YELLOW}Update cancelled.${NC}"
-        exit 0
+    # Prompt for confirmation (skip if -y flag or non-interactive)
+    if [ "$AUTO_CONFIRM" = false ]; then
+        # Check if we're in an interactive terminal
+        if [ -t 0 ]; then
+            read -p "Do you want to continue with the update? (y/N): " confirm
+            if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+                echo -e "${YELLOW}Update cancelled.${NC}"
+                exit 0
+            fi
+        else
+            echo -e "${YELLOW}Non-interactive mode detected. Use -y flag to auto-confirm.${NC}"
+            echo -e "Example: curl -sSL \"https://...update.sh\" | sudo bash -s -- -y"
+            exit 0
+        fi
     fi
     
     echo ""
