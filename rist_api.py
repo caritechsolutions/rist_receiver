@@ -1066,6 +1066,175 @@ def save_wireguard_config(config: dict = Body(...)):
         raise HTTPException(status_code=500, detail=f"Failed to save configuration: {str(e)}")
 
 
+# =============================================================================
+# Multicast Routing Configuration
+# =============================================================================
+
+NETPLAN_MCAST_FILE = "/etc/netplan/60-multicast-bridge.yaml"
+
+class MulticastConfig(BaseModel):
+    bridge_name: str = "br0"
+    bridge_address: str = "10.0.0.1/24"
+    multicast_route: str = "224.0.0.0/4"
+    bridge_members: List[str] = []
+
+
+@app.get("/system/multicast")
+def get_multicast_config():
+    """Get current multicast bridge configuration"""
+    config = {
+        "bridge_name": "br0",
+        "bridge_address": "10.0.0.1/24",
+        "multicast_route": "224.0.0.0/4",
+        "bridge_members": [],
+        "config_exists": False
+    }
+    
+    try:
+        if os.path.exists(NETPLAN_MCAST_FILE):
+            config["config_exists"] = True
+            with open(NETPLAN_MCAST_FILE, 'r') as f:
+                netplan_config = yaml.safe_load(f)
+            
+            if netplan_config and "network" in netplan_config:
+                bridges = netplan_config["network"].get("bridges", {})
+                
+                # Find the first bridge (should be our multicast bridge)
+                for bridge_name, bridge_config in bridges.items():
+                    config["bridge_name"] = bridge_name
+                    config["bridge_members"] = bridge_config.get("interfaces", [])
+                    
+                    # Get bridge address
+                    addresses = bridge_config.get("addresses", [])
+                    if addresses:
+                        config["bridge_address"] = addresses[0]
+                    
+                    # Get multicast route
+                    routes = bridge_config.get("routes", [])
+                    for route in routes:
+                        if route.get("to", "").startswith("224."):
+                            config["multicast_route"] = route.get("to", "224.0.0.0/4")
+                    break
+        
+        return config
+        
+    except Exception as e:
+        logger.error(f"Failed to read multicast config: {e}")
+        return config
+
+
+@app.post("/system/multicast")
+def save_multicast_config(config: MulticastConfig):
+    """Save multicast bridge configuration to netplan"""
+    try:
+        logger.info(f"Saving multicast config: bridge={config.bridge_name}, members={config.bridge_members}")
+        
+        # Build netplan configuration
+        netplan_config = {
+            "network": {
+                "version": 2,
+                "renderer": "networkd"
+            }
+        }
+        
+        if config.bridge_members:
+            # Create bridge configuration
+            netplan_config["network"]["bridges"] = {
+                config.bridge_name: {
+                    "interfaces": config.bridge_members,
+                    "addresses": [config.bridge_address],
+                    "routes": [
+                        {
+                            "to": config.multicast_route,
+                            "via": "0.0.0.0",
+                            "on-link": True
+                        }
+                    ],
+                    "parameters": {
+                        "stp": False,
+                        "forward-delay": 0
+                    }
+                }
+            }
+            
+            # Mark member interfaces (they shouldn't have their own IP when in bridge)
+            netplan_config["network"]["ethernets"] = {}
+            for member in config.bridge_members:
+                # Skip virtual interfaces
+                if not member.startswith(('wg', 'veth', 'docker', 'vir', 'br')):
+                    netplan_config["network"]["ethernets"][member] = {
+                        "dhcp4": False,
+                        "dhcp6": False
+                    }
+        
+        # Write netplan file
+        os.makedirs(os.path.dirname(NETPLAN_MCAST_FILE), exist_ok=True)
+        
+        with open(NETPLAN_MCAST_FILE, 'w') as f:
+            yaml.dump(netplan_config, f, default_flow_style=False, sort_keys=False)
+        
+        # Set proper permissions
+        os.chmod(NETPLAN_MCAST_FILE, 0o600)
+        
+        # Apply netplan configuration
+        try:
+            # First try to apply
+            result = subprocess.run(
+                ["netplan", "apply"],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"Netplan apply failed: {result.stderr}")
+                raise HTTPException(
+                    status_code=500, 
+                    detail=f"Failed to apply netplan: {result.stderr}"
+                )
+            
+            logger.info("Multicast configuration applied successfully")
+            
+            return {
+                "status": "success",
+                "message": "Multicast configuration saved and applied",
+                "bridge_name": config.bridge_name,
+                "bridge_members": config.bridge_members
+            }
+            
+        except subprocess.TimeoutExpired:
+            logger.error("Netplan apply timed out")
+            raise HTTPException(status_code=500, detail="Netplan apply timed out")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to save multicast config: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to save configuration: {str(e)}")
+
+
+@app.delete("/system/multicast")
+def delete_multicast_config():
+    """Remove multicast bridge configuration"""
+    try:
+        if os.path.exists(NETPLAN_MCAST_FILE):
+            os.remove(NETPLAN_MCAST_FILE)
+            
+            # Apply netplan to remove the bridge
+            subprocess.run(["netplan", "apply"], check=True, timeout=30)
+            
+            logger.info("Multicast configuration removed")
+            
+            return {"status": "success", "message": "Multicast configuration removed"}
+        else:
+            return {"status": "success", "message": "No multicast configuration to remove"}
+            
+    except Exception as e:
+        logger.error(f"Failed to remove multicast config: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to remove configuration: {str(e)}")
+
+
 @app.get("/channels")
 def get_channels():
     """Retrieve all channels with their current status"""
