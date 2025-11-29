@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Stats - RIST Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #111820;
+            --bg-tertiary: #1a2332;
+            --bg-hover: #232d3f;
+            --border-color: #2a3a4d;
+            --border-highlight: #3d5a80;
+            --text-primary: #e8eef4;
+            --text-secondary: #8899a8;
+            --text-muted: #5a6a7a;
+            --accent-blue: #3b82f6;
+            --accent-blue-dim: #2563eb;
+            --accent-green: #10b981;
+            --accent-green-dim: rgba(16, 185, 129, 0.15);
+            --accent-red: #ef4444;
+            --accent-red-dim: rgba(239, 68, 68, 0.15);
+            --accent-yellow: #f59e0b;
+            --accent-yellow-dim: rgba(245, 158, 11, 0.15);
+            --accent-purple: #8b5cf6;
+            --accent-purple-dim: rgba(139, 92, 246, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .app-container {
+            position: relative;
+            z-index: 1;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-color: var(--border-highlight);
+        }
+
+        .back-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .header-info h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-info .site-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--accent-blue);
+        }
+
+        .header-info .site-name::before {
+            content: '//';
+            color: var(--text-muted);
+            margin-right: 4px;
+        }
+
+        .header-info p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .stat-card .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+        }
+
+        .stat-card .icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stat-card .icon svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .stat-card .icon.cpu { background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); }
+        .stat-card .icon.memory { background: var(--accent-green-dim); color: var(--accent-green); }
+        .stat-card .icon.disk { background: var(--accent-purple-dim); color: var(--accent-purple); }
+        .stat-card .icon.temp { background: var(--accent-red-dim); color: var(--accent-red); }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: -1px;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .sub-value {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: var(--bg-primary);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+
+        .progress-bar .fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-bar .fill.cpu { background: var(--accent-blue); }
+        .progress-bar .fill.memory { background: var(--accent-green); }
+        .progress-bar .fill.disk { background: var(--accent-purple); }
+        .progress-bar .fill.temp { background: var(--accent-red); }
+
+        /* Panels */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            overflow: hidden;
+        }
+
+        .panel.full-width {
+            grid-column: span 2;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .panel-body {
+            padding: 20px;
+        }
+
+        /* Charts */
+        .chart-container {
+            height: 250px;
+            position: relative;
+        }
+
+        /* Network Interfaces Grid */
+        .network-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .network-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .network-card .interface-name {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .network-card .interface-name::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+        }
+
+        .network-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .network-stat {
+            background: var(--bg-secondary);
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .network-stat .label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .network-stat .value {
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .network-stat .total {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .network-stat.rx .value { color: var(--accent-green); }
+        .network-stat.tx .value { color: var(--accent-blue); }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .panel.full-width {
+                grid-column: span 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 16px;
+                align-items: flex-start;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <a href="/" class="back-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <div class="header-info">
+                    <h1>
+                        System Stats
+                        <span class="site-name" id="siteName"></span>
+                    </h1>
+                    <p>Real-time server performance metrics</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="header-row">
+                    <span class="label">CPU Usage</span>
+                    <div class="icon cpu">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="4" y="4" width="16" height="16" rx="2"/>
+                            <rect x="9" y="9" width="6" height="6"/>
+                            <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>
+                        </svg>
+                    </div>
+                </div>
+                <div id="cpuValue" class="value">0%</div>
+                <div class="progress-bar">
+                    <div id="cpuBar" class="fill cpu" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="header-row">
+                    <span class="label">Memory Usage</span>
+                    <div class="icon memory">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 19v-3M10 19v-3M14 19v-3M18 19v-3M6 8v-3M10 8v-3M14 8v-3M18 8v-3"/>
+                            <rect x="3" y="8" width="18" height="8" rx="1"/>
+                        </svg>
+                    </div>
+                </div>
+                <div id="memoryValue" class="value">0%</div>
+                <div id="memoryDetail" class="sub-value">0 GB / 0 GB</div>
+                <div class="progress-bar">
+                    <div id="memoryBar" class="fill memory" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="header-row">
+                    <span class="label">Disk Usage</span>
+                    <div class="icon disk">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                        </svg>
+                    </div>
+                </div>
+                <div id="diskValue" class="value">0%</div>
+                <div id="diskDetail" class="sub-value">0 GB / 0 GB</div>
+                <div class="progress-bar">
+                    <div id="diskBar" class="fill disk" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="header-row">
+                    <span class="label">CPU Temperature</span>
+                    <div class="icon temp">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z"/>
+                        </svg>
+                    </div>
+                </div>
+                <div id="tempValue" class="value">0°C</div>
+                <div class="progress-bar">
+                    <div id="tempBar" class="fill temp" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="main-grid">
+            <!-- CPU History -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>CPU History</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="chart-container">
+                        <canvas id="cpuChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bandwidth History -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Network Bandwidth</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="chart-container">
+                        <canvas id="bandwidthChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Interfaces -->
+        <div class="panel full-width">
+            <div class="panel-header">
+                <h2>Network Interfaces</h2>
+            </div>
+            <div class="panel-body">
+                <div id="networkGrid" class="network-grid">
+                    <!-- Network cards will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
+        const MAX_DATA_POINTS = 50;
+        
+        let cpuChart, bandwidthChart;
+        const networkHistory = {};
+        const cpuData = [];
+        const cpuLabels = [];
+
+        // Fetch hostname
+        async function loadHostname() {
+            try {
+                const response = await fetch(`${API_BASE}/system/hostname`);
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('siteName').textContent = data.hostname || '';
+                    document.title = `System Stats - RIST Manager // ${data.hostname}`;
+                }
+            } catch (error) {
+                console.error('Error fetching hostname:', error);
+            }
+        }
+
+        // Format bytes
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
+        }
+
+        function formatBytesPerSec(bytes) {
+            if (bytes === 0) return '0 B/s';
+            const k = 1024;
+            const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+            const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function formatBits(bits) {
+            if (bits === 0) return '0 bps';
+            const k = 1000;
+            const sizes = ['bps', 'Kbps', 'Mbps', 'Gbps'];
+            const i = Math.min(Math.floor(Math.log(bits) / Math.log(k)), sizes.length - 1);
+            return parseFloat((bits / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Calculate network bandwidth
+        function calculateNetworkBandwidth(currentStats) {
+            const now = Date.now() / 1000;
+            const bandwidthStats = {};
+
+            Object.entries(currentStats).forEach(([iface, stats]) => {
+                if (!networkHistory[iface]) {
+                    networkHistory[iface] = {
+                        lastTimestamp: now,
+                        lastBytesSent: stats.bytes_sent,
+                        lastBytesRecv: stats.bytes_recv,
+                        sentBps: 0,
+                        recvBps: 0
+                    };
+                }
+
+                const history = networkHistory[iface];
+                const timeDiff = now - history.lastTimestamp;
+                
+                const sentDiff = stats.bytes_sent - history.lastBytesSent;
+                const recvDiff = stats.bytes_recv - history.lastBytesRecv;
+
+                const sentBps = timeDiff > 0 ? (sentDiff * 8) / timeDiff : 0;
+                const recvBps = timeDiff > 0 ? (recvDiff * 8) / timeDiff : 0;
+
+                history.lastTimestamp = now;
+                history.lastBytesSent = stats.bytes_sent;
+                history.lastBytesRecv = stats.bytes_recv;
+                history.sentBps = sentBps;
+                history.recvBps = recvBps;
+
+                bandwidthStats[iface] = {
+                    sent: sentBps,
+                    recv: recvBps,
+                    total_sent: stats.bytes_sent,
+                    total_recv: stats.bytes_recv
+                };
+            });
+
+            return bandwidthStats;
+        }
+
+        // Initialize charts
+        function initCharts() {
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                plugins: {
+                    legend: { 
+                        display: true,
+                        labels: { color: '#8899a8' }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(42, 58, 77, 0.5)' },
+                        ticks: { color: '#5a6a7a', maxTicksLimit: 8 }
+                    },
+                    y: {
+                        grid: { color: 'rgba(42, 58, 77, 0.5)' },
+                        ticks: { color: '#5a6a7a' },
+                        beginAtZero: true
+                    }
+                }
+            };
+
+            cpuChart = new Chart(document.getElementById('cpuChart'), {
+                type: 'line',
+                data: {
+                    labels: cpuLabels,
+                    datasets: [{
+                        label: 'CPU %',
+                        data: cpuData,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        ...chartOptions.scales,
+                        y: { ...chartOptions.scales.y, max: 100 }
+                    }
+                }
+            });
+
+            bandwidthChart = new Chart(document.getElementById('bandwidthChart'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: []
+                },
+                options: {
+                    ...chartOptions,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: { color: '#8899a8', boxWidth: 12 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.dataset.label}: ${formatBits(ctx.parsed.y)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        ...chartOptions.scales,
+                        y: {
+                            ...chartOptions.scales.y,
+                            ticks: {
+                                color: '#5a6a7a',
+                                callback: (value) => formatBits(value)
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update network interfaces display
+        function updateNetworkInterfaces(networkData) {
+            const grid = document.getElementById('networkGrid');
+            grid.innerHTML = '';
+
+            Object.entries(networkData).forEach(([iface, stats]) => {
+                const card = document.createElement('div');
+                card.className = 'network-card';
+                card.innerHTML = `
+                    <div class="interface-name">${iface}</div>
+                    <div class="network-stats">
+                        <div class="network-stat rx">
+                            <div class="label">Received</div>
+                            <div class="value">${formatBytesPerSec(stats.recv / 8)}</div>
+                            <div class="total">Total: ${formatBytes(stats.total_recv)}</div>
+                        </div>
+                        <div class="network-stat tx">
+                            <div class="label">Sent</div>
+                            <div class="value">${formatBytesPerSec(stats.sent / 8)}</div>
+                            <div class="total">Total: ${formatBytes(stats.total_sent)}</div>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // Update metrics
+        async function updateMetrics() {
+            try {
+                const response = await fetch(`${API_BASE}/health/metrics`);
+                const data = await response.json();
+
+                // CPU
+                document.getElementById('cpuValue').textContent = `${data.cpu.average.toFixed(1)}%`;
+                document.getElementById('cpuBar').style.width = `${data.cpu.average}%`;
+
+                // Memory
+                const memPercent = data.memory.used_percent;
+                document.getElementById('memoryValue').textContent = `${memPercent.toFixed(1)}%`;
+                document.getElementById('memoryDetail').textContent = 
+                    `${formatBytes(data.memory.used)} / ${formatBytes(data.memory.total)}`;
+                document.getElementById('memoryBar').style.width = `${memPercent}%`;
+
+                // Disk
+                const diskPercent = data.disk.used_percent;
+                document.getElementById('diskValue').textContent = `${diskPercent.toFixed(1)}%`;
+                document.getElementById('diskDetail').textContent = 
+                    `${formatBytes(data.disk.used)} / ${formatBytes(data.disk.total)}`;
+                document.getElementById('diskBar').style.width = `${diskPercent}%`;
+
+                // Temperature
+                const temp = data.temperature || 0;
+                document.getElementById('tempValue').textContent = `${temp}°C`;
+                document.getElementById('tempBar').style.width = `${Math.min((temp / 100) * 100, 100)}%`;
+                
+                // Color based on temp
+                const tempBar = document.getElementById('tempBar');
+                if (temp > 80) tempBar.style.background = '#ef4444';
+                else if (temp > 60) tempBar.style.background = '#f59e0b';
+                else tempBar.style.background = '#10b981';
+
+                // CPU Chart
+                const now = new Date().toLocaleTimeString();
+                cpuLabels.push(now);
+                cpuData.push(data.cpu.average);
+
+                if (cpuLabels.length > MAX_DATA_POINTS) {
+                    cpuLabels.shift();
+                    cpuData.shift();
+                }
+                cpuChart.update('none');
+
+                // Network
+                const networkBandwidth = calculateNetworkBandwidth(data.network);
+                updateNetworkInterfaces(networkBandwidth);
+
+                // Bandwidth Chart
+                const bandwidthDatasets = [];
+                const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+                let colorIndex = 0;
+
+                Object.entries(networkBandwidth).forEach(([iface, stats]) => {
+                    // Find or create dataset for this interface
+                    let dataset = bandwidthChart.data.datasets.find(d => d.label === `${iface} RX`);
+                    
+                    if (!dataset) {
+                        const color = colors[colorIndex % colors.length];
+                        bandwidthChart.data.datasets.push({
+                            label: `${iface} RX`,
+                            data: [],
+                            borderColor: color,
+                            backgroundColor: `${color}20`,
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 0
+                        });
+                        dataset = bandwidthChart.data.datasets[bandwidthChart.data.datasets.length - 1];
+                    }
+                    
+                    dataset.data.push(stats.recv);
+                    if (dataset.data.length > MAX_DATA_POINTS) dataset.data.shift();
+                    
+                    colorIndex++;
+                });
+
+                // Update bandwidth chart labels
+                if (bandwidthChart.data.labels.length >= MAX_DATA_POINTS) {
+                    bandwidthChart.data.labels.shift();
+                }
+                bandwidthChart.data.labels.push(now);
+                bandwidthChart.update('none');
+
+            } catch (error) {
+                console.error('Error fetching metrics:', error);
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHostname();
+            initCharts();
+            updateMetrics();
+            setInterval(updateMetrics, 5000);
+        });
+    </script>
+</body>
+</html>
