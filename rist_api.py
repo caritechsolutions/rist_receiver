@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException, Query, Body
+from fastapi import FastAPI, HTTPException, Query, Body, Request, Response, Depends, Cookie
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 import yaml
 import subprocess
@@ -8,7 +9,7 @@ import requests
 from typing import Dict, Optional, List
 import logging
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 from functools import lru_cache
 import traceback
@@ -18,6 +19,8 @@ import asyncio
 import uvicorn
 import socket
 import netifaces
+import hashlib
+import secrets
 
 
 # Global variable to store previous network stats for bandwidth calculation
@@ -26,6 +29,11 @@ previous_network_timestamp = 0
 
 channel_monitors: Dict[str, asyncio.Task] = {}
 channel_last_active: Dict[str, float] = {}
+
+# Session storage (in-memory)
+sessions: Dict[str, dict] = {}
+SESSION_TIMEOUT_HOURS = 24
+AUTH_CONFIG_FILE = "/root/rist/auth.yaml"
 
 # Logging Configuration with rotation
 from logging.handlers import RotatingFileHandler
@@ -55,12 +63,133 @@ CONFIG_FILE = "receiver_config.yaml"
 SERVICE_DIR = "/etc/systemd/system"
 
 
+# =============================================================================
+# Authentication Functions
+# =============================================================================
+
+def hash_password(password: str) -> str:
+    """Hash a password using SHA-256 with salt"""
+    salt = "rist_receiver_salt_2024"  # Static salt for simplicity
+    return hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
+
+
+def load_auth_config() -> dict:
+    """Load authentication configuration"""
+    default_config = {
+        "username": "admin",
+        "password_hash": hash_password("admin"),  # Default password: admin
+        "initialized": False
+    }
+    
+    if not os.path.exists(AUTH_CONFIG_FILE):
+        save_auth_config(default_config)
+        return default_config
+    
+    try:
+        with open(AUTH_CONFIG_FILE, 'r') as f:
+            return yaml.safe_load(f) or default_config
+    except Exception as e:
+        logger.error(f"Failed to load auth config: {e}")
+        return default_config
+
+
+def save_auth_config(config: dict):
+    """Save authentication configuration"""
+    try:
+        os.makedirs(os.path.dirname(AUTH_CONFIG_FILE), exist_ok=True)
+        with open(AUTH_CONFIG_FILE, 'w') as f:
+            yaml.safe_dump(config, f)
+        os.chmod(AUTH_CONFIG_FILE, 0o600)  # Restrict permissions
+    except Exception as e:
+        logger.error(f"Failed to save auth config: {e}")
+
+
+def create_session(username: str) -> str:
+    """Create a new session and return session token"""
+    token = secrets.token_urlsafe(32)
+    sessions[token] = {
+        "username": username,
+        "created": datetime.now(),
+        "expires": datetime.now() + timedelta(hours=SESSION_TIMEOUT_HOURS)
+    }
+    return token
+
+
+def validate_session(token: str) -> Optional[dict]:
+    """Validate a session token"""
+    if not token or token not in sessions:
+        return None
+    
+    session = sessions[token]
+    if datetime.now() > session["expires"]:
+        del sessions[token]
+        return None
+    
+    return session
+
+
+def cleanup_expired_sessions():
+    """Remove expired sessions"""
+    now = datetime.now()
+    expired = [token for token, session in sessions.items() if now > session["expires"]]
+    for token in expired:
+        del sessions[token]
+
+
+# Dependency to check authentication
+async def require_auth(request: Request):
+    """Dependency that requires authentication for protected endpoints"""
+    # Get session token from cookie
+    token = request.cookies.get("session_token")
+    
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    session = validate_session(token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Session expired")
+    
+    return session
+
+
+# Public endpoints that don't require auth
+PUBLIC_PATHS = ["/auth/login", "/auth/status", "/auth/logout", "/docs", "/openapi.json", "/"]
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Authentication Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Skip auth for public paths
+        path = request.url.path
+        if any(path.startswith(p) for p in PUBLIC_PATHS):
+            return await call_next(request)
+        
+        # Check for valid session
+        token = request.cookies.get("session_token")
+        if not token or not validate_session(token):
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Not authenticated"}
+            )
+        
+        # Clean up expired sessions periodically
+        cleanup_expired_sessions()
+        
+        return await call_next(request)
+
+app.add_middleware(AuthMiddleware)
+
 
 # Metrics Caching
 metrics_cache = {}
@@ -494,8 +623,115 @@ def save_config(config):
         yaml.dump(config, f)
 
 
+# =============================================================================
+# Authentication Endpoints (Public)
+# =============================================================================
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@app.get("/auth/status")
+def auth_status(request: Request):
+    """Check if user is authenticated and if default password needs to be changed"""
+    token = request.cookies.get("session_token")
+    session = validate_session(token) if token else None
+    
+    auth_config = load_auth_config()
+    
+    return {
+        "authenticated": session is not None,
+        "username": session["username"] if session else None,
+        "needs_password_change": not auth_config.get("initialized", False)
+    }
+
+
+@app.post("/auth/login")
+def login(login_req: LoginRequest, response: Response):
+    """Login and create session"""
+    auth_config = load_auth_config()
+    
+    # Check credentials
+    if login_req.username != auth_config["username"]:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    if hash_password(login_req.password) != auth_config["password_hash"]:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    # Create session
+    token = create_session(login_req.username)
+    
+    # Set cookie
+    response.set_cookie(
+        key="session_token",
+        value=token,
+        httponly=True,
+        max_age=SESSION_TIMEOUT_HOURS * 3600,
+        samesite="lax"
+    )
+    
+    logger.info(f"User {login_req.username} logged in")
+    
+    return {
+        "status": "success",
+        "message": "Login successful",
+        "needs_password_change": not auth_config.get("initialized", False)
+    }
+
+
+@app.post("/auth/logout")
+def logout(request: Request, response: Response):
+    """Logout and destroy session"""
+    token = request.cookies.get("session_token")
+    
+    if token and token in sessions:
+        del sessions[token]
+    
+    response.delete_cookie("session_token")
+    
+    return {"status": "success", "message": "Logged out"}
+
+
+@app.post("/auth/change-password")
+def change_password(request: Request, pwd_req: ChangePasswordRequest):
+    """Change password (requires authentication)"""
+    token = request.cookies.get("session_token")
+    session = validate_session(token)
+    
+    if not session:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    auth_config = load_auth_config()
+    
+    # Verify current password
+    if hash_password(pwd_req.current_password) != auth_config["password_hash"]:
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    
+    # Validate new password
+    if len(pwd_req.new_password) < 4:
+        raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+    
+    # Update password
+    auth_config["password_hash"] = hash_password(pwd_req.new_password)
+    auth_config["initialized"] = True
+    save_auth_config(auth_config)
+    
+    logger.info(f"Password changed for user {session['username']}")
+    
+    return {"status": "success", "message": "Password changed successfully"}
+
+
 @app.on_event("startup")
 def startup_event():
+    # Initialize auth config on startup
+    load_auth_config()
+    
     @app.get("/")
     def wait_for_startup():
         return {"status": "ready"}
