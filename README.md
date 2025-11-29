@@ -7,6 +7,6 @@ curl -sSL "https://raw.githubusercontent.com/caritechsolutions/rist_receiver/mai
 
 To update the software run the following:
 
-wget https://raw.githubusercontent.com/caritechsolutions/rist_receiver/main/update.sh
-chmod +x update.sh
+wget https://raw.githubusercontent.com/caritechsolutions/rist_receiver/main/update.sh </br>
+chmod +x update.sh <br>
 sudo ./update.sh
