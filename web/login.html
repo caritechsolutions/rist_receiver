@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - RIST Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #111820;
+            --bg-tertiary: #1a2332;
+            --border-color: #2a3a4d;
+            --border-highlight: #3b82f6;
+            --text-primary: #e8eef4;
+            --text-secondary: #8899a8;
+            --text-muted: #5a6a7a;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-image: 
+                radial-gradient(circle at 25% 25%, rgba(59, 130, 246, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(16, 185, 129, 0.03) 0%, transparent 50%);
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+        }
+
+        .login-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 40px;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .login-logo {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, var(--accent-blue), #1d4ed8);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            box-shadow: 0 8px 32px rgba(59, 130, 246, 0.25);
+        }
+
+        .login-logo svg {
+            width: 32px;
+            height: 32px;
+            color: white;
+        }
+
+        .login-header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .login-header p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        .form-group input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: var(--accent-blue);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-login:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .btn-login:active {
+            transform: translateY(0);
+        }
+
+        .btn-login:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--accent-red);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error-message.visible {
+            display: block;
+        }
+
+        .password-change-notice {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: var(--accent-yellow);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .password-change-notice.visible {
+            display: block;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* Change Password Form */
+        .change-password-form {
+            display: none;
+        }
+
+        .change-password-form.visible {
+            display: block;
+        }
+
+        .login-form.hidden {
+            display: none;
+        }
+
+        .back-link {
+            color: var(--accent-blue);
+            font-size: 13px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 20px;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .back-link svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .success-message {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--accent-green);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .success-message.visible {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-logo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                </div>
+                <h1>RIST Manager</h1>
+                <p id="headerSubtitle">Sign in to continue</p>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
+            <div class="password-change-notice" id="passwordNotice">
+                <strong>Default password detected.</strong> Please change your password after logging in.
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="login-form" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="Enter username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="Enter password" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn-login" id="loginBtn">Sign In</button>
+            </form>
+
+            <!-- Change Password Form -->
+            <form id="changePasswordForm" class="change-password-form" onsubmit="handleChangePassword(event)">
+                <a href="#" class="back-link" onclick="showLoginForm(event)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                    Back to login
+                </a>
+                <div class="form-group">
+                    <label for="currentPassword">Current Password</label>
+                    <input type="password" id="currentPassword" name="currentPassword" placeholder="Enter current password" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">New Password</label>
+                    <input type="password" id="newPassword" name="newPassword" placeholder="Enter new password" required minlength="4">
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm New Password</label>
+                    <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm new password" required>
+                </div>
+                <button type="submit" class="btn-login" id="changePasswordBtn">Change Password</button>
+            </form>
+
+            <div class="footer">
+                RIST Receiver Management System
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
+        let needsPasswordChange = false;
+
+        // Check if already authenticated
+        async function checkAuth() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/status`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (data.authenticated) {
+                    if (data.needs_password_change) {
+                        showChangePasswordForm();
+                    } else {
+                        window.location.href = '/';
+                    }
+                } else if (data.needs_password_change) {
+                    document.getElementById('passwordNotice').classList.add('visible');
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+            }
+        }
+
+        // Handle login
+        async function handleLogin(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('loginBtn');
+            const errorEl = document.getElementById('errorMessage');
+            
+            btn.disabled = true;
+            btn.textContent = 'Signing in...';
+            errorEl.classList.remove('visible');
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Login failed');
+                }
+                
+                if (data.needs_password_change) {
+                    needsPasswordChange = true;
+                    showChangePasswordForm();
+                } else {
+                    window.location.href = '/';
+                }
+                
+            } catch (error) {
+                errorEl.textContent = error.message;
+                errorEl.classList.add('visible');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+            }
+        }
+
+        // Handle password change
+        async function handleChangePassword(event) {
+            event.preventDefault();
+            
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const btn = document.getElementById('changePasswordBtn');
+            const errorEl = document.getElementById('errorMessage');
+            const successEl = document.getElementById('successMessage');
+            
+            errorEl.classList.remove('visible');
+            successEl.classList.remove('visible');
+            
+            if (newPassword !== confirmPassword) {
+                errorEl.textContent = 'New passwords do not match';
+                errorEl.classList.add('visible');
+                return;
+            }
+            
+            if (newPassword.length < 4) {
+                errorEl.textContent = 'Password must be at least 4 characters';
+                errorEl.classList.add('visible');
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = 'Changing...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/change-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ 
+                        current_password: currentPassword, 
+                        new_password: newPassword 
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Password change failed');
+                }
+                
+                successEl.textContent = 'Password changed successfully! Redirecting...';
+                successEl.classList.add('visible');
+                
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1500);
+                
+            } catch (error) {
+                errorEl.textContent = error.message;
+                errorEl.classList.add('visible');
+                btn.disabled = false;
+                btn.textContent = 'Change Password';
+            }
+        }
+
+        // Show change password form
+        function showChangePasswordForm() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('changePasswordForm').classList.add('visible');
+            document.getElementById('headerSubtitle').textContent = 'Change your password';
+            document.getElementById('passwordNotice').classList.remove('visible');
+            document.getElementById('errorMessage').classList.remove('visible');
+        }
+
+        // Show login form
+        function showLoginForm(event) {
+            if (event) event.preventDefault();
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('changePasswordForm').classList.remove('visible');
+            document.getElementById('headerSubtitle').textContent = 'Sign in to continue';
+            document.getElementById('errorMessage').classList.remove('visible');
+            document.getElementById('successMessage').classList.remove('visible');
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', checkAuth);
+    </script>
+</body>
+</html>
