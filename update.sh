@@ -108,7 +108,7 @@ update_web() {
     echo -e "${YELLOW}Updating web interface...${NC}"
     
     # List of web files to update
-    WEB_FILES=("index.html" "stats.html" "dash.html" "edit.html" "channel_config.html" "login.html")
+    WEB_FILES=("index.html" "stats.html" "dash.html" "edit.html" "channel_config.html" "login.html" "settings.html")
     
     for file in "${WEB_FILES[@]}"; do
         if [ -f "$TEMP_DIR/rist_receiver/web/$file" ]; then
