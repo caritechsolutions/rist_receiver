@@ -7,4 +7,4 @@ curl -sSL "https://raw.githubusercontent.com/caritechsolutions/rist_receiver/mai
 
 To update the software run the following:
 
-curl -sSL "https://raw.githubusercontent.com/caritechsolutions/rist_receiver/main/update.sh?$(date +%s)" | sudo bash
+curl -sSL "https://raw.githubusercontent.com/caritechsolutions/rist_receiver/main/update.sh?$(date +%s)" | sudo bash -s -- -y
