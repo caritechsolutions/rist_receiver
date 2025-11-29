@@ -599,6 +599,14 @@
                     <p>Real-time server performance metrics</p>
                 </div>
             </div>
+            <button class="btn btn-secondary" onclick="logout()" title="Logout" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); cursor: pointer;">
+                <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                Logout
+            </button>
         </header>
 
         <!-- Stats Grid -->
@@ -793,10 +801,44 @@ AllowedIPs = 0.0.0.0/0"></textarea>
         const cpuData = [];
         const cpuLabels = [];
 
+        // Check authentication on page load
+        async function checkAuth() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/status`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (!data.authenticated) {
+                    window.location.href = '/login.html';
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                window.location.href = '/login.html';
+                return false;
+            }
+        }
+
+        // Logout function
+        async function logout() {
+            try {
+                await fetch(`${API_BASE}/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+            window.location.href = '/login.html';
+        }
+
         // Fetch hostname
         async function loadHostname() {
             try {
-                const response = await fetch(`${API_BASE}/system/hostname`);
+                const response = await fetch(`${API_BASE}/system/hostname`, {
+                    credentials: 'include'
+                });
                 if (response.ok) {
                     const data = await response.json();
                     document.getElementById('siteName').textContent = data.hostname || '';
@@ -1252,7 +1294,11 @@ AllowedIPs = 0.0.0.0/0"></textarea>
         });
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check authentication first
+            const isAuthenticated = await checkAuth();
+            if (!isAuthenticated) return;
+
             loadHostname();
             initCharts();
             updateMetrics();
