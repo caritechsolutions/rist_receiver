@@ -1082,8 +1082,8 @@
             return `${mbps} Mbps`;
         }
 
-        // Update network interfaces detail
-        async function updateNetworkInterfaces() {
+        // Update network interfaces detail cards
+        async function updateInterfaceDetails() {
             try {
                 const response = await fetch(`${API_BASE}/system/network-interfaces`);
                 if (!response.ok) return;
@@ -1152,10 +1152,10 @@
             loadHostname();
             initCharts();
             updateMetrics();
-            updateNetworkInterfaces();
+            updateInterfaceDetails();
             
             setInterval(updateMetrics, 5000);
-            setInterval(updateNetworkInterfaces, 10000); // Refresh interfaces every 10s
+            setInterval(updateInterfaceDetails, 10000); // Refresh interfaces every 10s
         });
     </script>
 </body>
