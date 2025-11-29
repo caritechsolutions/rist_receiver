@@ -599,14 +599,23 @@
                     <p>Real-time server performance metrics</p>
                 </div>
             </div>
-            <button class="btn btn-secondary" onclick="logout()" title="Logout" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); cursor: pointer;">
-                <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
-                    <polyline points="16 17 21 12 16 7"/>
-                    <line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
-                Logout
-            </button>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <a href="settings.html" class="btn btn-secondary" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); text-decoration: none;">
+                    <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                    </svg>
+                    Settings
+                </a>
+                <button class="btn btn-secondary" onclick="logout()" title="Logout" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); cursor: pointer;">
+                    <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                    Logout
+                </button>
+            </div>
         </header>
 
         <!-- Stats Grid -->
@@ -726,67 +735,6 @@
             <div class="panel-body">
                 <div id="networkGrid" class="network-grid">
                     <!-- Bandwidth cards will be populated here -->
-                </div>
-            </div>
-        </div>
-
-        <!-- WireGuard Configuration -->
-        <div class="panel full-width">
-            <div class="panel-header">
-                <h2>WireGuard VPN</h2>
-                <div class="wg-status" id="wgStatus">
-                    <span class="status-dot offline"></span>
-                    <span>Checking...</span>
-                </div>
-            </div>
-            <div class="panel-body">
-                <div class="wg-container">
-                    <div class="wg-controls">
-                        <label class="file-upload-btn">
-                            <input type="file" id="wgFileInput" accept=".conf" style="display: none;">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                                <polyline points="17 8 12 3 7 8"/>
-                                <line x1="12" y1="3" x2="12" y2="15"/>
-                            </svg>
-                            Upload Config
-                        </label>
-                        <button class="btn btn-secondary" onclick="refreshWireGuard()">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M23 4v6h-6M1 20v-6h6"/>
-                                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-                            </svg>
-                            Refresh
-                        </button>
-                    </div>
-                    <div class="wg-editor-container">
-                        <label for="wgConfig">Configuration (/etc/wireguard/wg0.conf)</label>
-                        <textarea id="wgConfig" class="wg-editor" placeholder="# WireGuard configuration will appear here...
-# Upload a .conf file or paste your configuration
-
-[Interface]
-PrivateKey = your_private_key
-Address = 10.0.0.2/24
-
-[Peer]
-PublicKey = peer_public_key
-Endpoint = vpn.example.com:51820
-AllowedIPs = 0.0.0.0/0"></textarea>
-                    </div>
-                    <div class="wg-actions">
-                        <button class="btn btn-primary" onclick="saveWireGuard()">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
-                                <polyline points="17 21 17 13 7 13 7 21"/>
-                                <polyline points="7 3 7 8 15 8"/>
-                            </svg>
-                            Save &amp; Apply
-                        </button>
-                    </div>
-                    <div class="wg-info" id="wgInfo" style="display: none;">
-                        <h4>Connection Status</h4>
-                        <pre id="wgStatusDetail"></pre>
-                    </div>
                 </div>
             </div>
         </div>
@@ -1195,104 +1143,6 @@ AllowedIPs = 0.0.0.0/0"></textarea>
             }
         }
 
-        // WireGuard functions
-        async function loadWireGuard() {
-            try {
-                const response = await fetch(`${API_BASE}/system/wireguard`);
-                if (!response.ok) return;
-                
-                const data = await response.json();
-                
-                // Update status indicator
-                const statusEl = document.getElementById('wgStatus');
-                const isActive = data.service_status === 'active';
-                statusEl.innerHTML = `
-                    <span class="status-dot ${isActive ? 'active' : 'offline'}"></span>
-                    <span>${isActive ? 'Connected' : 'Disconnected'}</span>
-                `;
-                
-                // Update config editor
-                if (data.config_content) {
-                    document.getElementById('wgConfig').value = data.config_content;
-                }
-                
-                // Update status detail
-                const infoEl = document.getElementById('wgInfo');
-                const detailEl = document.getElementById('wgStatusDetail');
-                if (data.wg_status) {
-                    infoEl.style.display = 'block';
-                    detailEl.textContent = data.wg_status;
-                } else {
-                    infoEl.style.display = 'none';
-                }
-                
-            } catch (error) {
-                console.error('Error loading WireGuard config:', error);
-            }
-        }
-
-        async function saveWireGuard() {
-            const config = document.getElementById('wgConfig').value;
-            
-            if (!config.trim()) {
-                alert('Configuration cannot be empty');
-                return;
-            }
-            
-            if (!config.includes('[Interface]')) {
-                alert('Invalid configuration: missing [Interface] section');
-                return;
-            }
-            
-            if (!confirm('This will save the WireGuard configuration and restart the service. Continue?')) {
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${API_BASE}/system/wireguard`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ config_content: config })
-                });
-                
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to save configuration');
-                }
-                
-                alert('WireGuard configuration saved and service started!');
-                
-                // Refresh status after a short delay
-                setTimeout(() => {
-                    loadWireGuard();
-                    updateNetworkInterfaces();
-                }, 2000);
-                
-            } catch (error) {
-                console.error('Error saving WireGuard config:', error);
-                alert('Failed to save configuration: ' + error.message);
-            }
-        }
-
-        function refreshWireGuard() {
-            loadWireGuard();
-        }
-
-        // Handle file upload
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('wgFileInput').addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    document.getElementById('wgConfig').value = event.target.result;
-                };
-                reader.readAsText(file);
-                e.target.value = ''; // Reset input
-            });
-        });
-
         // Initialize
         document.addEventListener('DOMContentLoaded', async () => {
             // Check authentication first
@@ -1303,7 +1153,6 @@ AllowedIPs = 0.0.0.0/0"></textarea>
             initCharts();
             updateMetrics();
             updateNetworkInterfaces();
-            loadWireGuard();
             
             setInterval(updateMetrics, 5000);
             setInterval(updateNetworkInterfaces, 10000); // Refresh interfaces every 10s
