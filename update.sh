@@ -97,6 +97,18 @@ update_api() {
         echo -e "  Updated: rist-failover.py"
     fi
     
+    # Update MediaMTX base config (API will regenerate paths)
+    if [ -f "$TEMP_DIR/rist_receiver/mediamtx.yml" ]; then
+        cp "$TEMP_DIR/rist_receiver/mediamtx.yml" /root/rist/mediamtx.yml
+        echo -e "  Updated: mediamtx.yml (base config)"
+    fi
+    
+    # Update service files
+    if [ -d "$TEMP_DIR/rist_receiver/services" ]; then
+        cp "$TEMP_DIR/rist_receiver/services/"*.service /root/rist/services/ 2>/dev/null || true
+        echo -e "  Updated: service files"
+    fi
+    
     # Set permissions
     chmod +x /root/rist/*.py
     
@@ -117,8 +129,7 @@ update_web() {
         fi
     done
     
-    # Preserve content directory (HLS streams)
-    # Don't touch /var/www/html/content/
+    # Content directory is mounted as tmpfs, no need to preserve
     
     # Set permissions
     chmod -R 755 /var/www/html
@@ -161,6 +172,12 @@ restart_services() {
         echo -e "  Restarted: rist-failover"
     fi
     
+    # Restart MediaMTX service
+    if systemctl is-active --quiet mediamtx; then
+        systemctl restart mediamtx
+        echo -e "  Restarted: mediamtx"
+    fi
+    
     # Restart nginx
     if systemctl is-active --quiet nginx; then
         systemctl reload nginx
@@ -192,7 +209,7 @@ show_plan() {
     echo -e "  - /root/rist/receiver_config.yaml (your channel config)"
     echo -e "  - /root/rist/backup_sources.yaml (your backup sources)"
     echo -e "  - /etc/systemd/system/rist-*.service (service files)"
-    echo -e "  - /var/www/html/content/ (HLS streams)"
+    echo -e "  - /opt/mediamtx/ (MediaMTX installation)"
     echo ""
 }
 
