@@ -1274,6 +1274,65 @@ def get_next_channel_info():
         "metrics_port": next_metrics_port
     }
 
+
+class BulkOperationRequest(BaseModel):
+    channel_ids: List[str]
+    operation: str  # "restart", "start", "stop"
+
+
+@app.post("/channels/bulk")
+def bulk_channel_operation(request: BulkOperationRequest):
+    """Perform bulk operations on multiple channels"""
+    config = load_config()
+    results = {
+        "success": [],
+        "failed": []
+    }
+    
+    for channel_id in request.channel_ids:
+        if channel_id not in config["channels"]:
+            results["failed"].append({"channel_id": channel_id, "error": "Channel not found"})
+            continue
+        
+        try:
+            if request.operation == "restart":
+                subprocess.run(
+                    ["systemctl", "restart", f"rist-channel-{channel_id}.service"],
+                    check=True,
+                    timeout=30
+                )
+                results["success"].append(channel_id)
+                logger.info(f"Restarted channel {channel_id}")
+                
+            elif request.operation == "start":
+                subprocess.run(["systemctl", "enable", f"rist-channel-{channel_id}.service"], check=True)
+                subprocess.run(["systemctl", "start", f"rist-channel-{channel_id}.service"], check=True)
+                results["success"].append(channel_id)
+                logger.info(f"Started channel {channel_id}")
+                
+            elif request.operation == "stop":
+                subprocess.run(["systemctl", "stop", f"rist-channel-{channel_id}.service"], check=True)
+                subprocess.run(["systemctl", "disable", f"rist-channel-{channel_id}.service"], check=True)
+                results["success"].append(channel_id)
+                logger.info(f"Stopped channel {channel_id}")
+                
+            else:
+                results["failed"].append({"channel_id": channel_id, "error": f"Unknown operation: {request.operation}"})
+                
+        except subprocess.CalledProcessError as e:
+            results["failed"].append({"channel_id": channel_id, "error": str(e)})
+            logger.error(f"Failed to {request.operation} channel {channel_id}: {e}")
+        except subprocess.TimeoutExpired:
+            results["failed"].append({"channel_id": channel_id, "error": "Operation timed out"})
+            logger.error(f"Timeout during {request.operation} of channel {channel_id}")
+    
+    return {
+        "status": "completed",
+        "operation": request.operation,
+        "results": results
+    }
+
+
 @app.get("/channels/{channel_id}")
 def get_channel(channel_id: str):
     """Retrieve details of a specific channel"""
@@ -1360,65 +1419,6 @@ def stop_channel(channel_id: str):
         return {"status": "stopped"}
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=f"Failed to stop services: {e.stderr}")
-
-
-class BulkOperationRequest(BaseModel):
-    channel_ids: List[str]
-    operation: str  # "restart", "start", "stop"
-
-
-@app.post("/channels/bulk")
-def bulk_channel_operation(request: BulkOperationRequest):
-    """Perform bulk operations on multiple channels"""
-    config = load_config()
-    results = {
-        "success": [],
-        "failed": []
-    }
-    
-    for channel_id in request.channel_ids:
-        if channel_id not in config["channels"]:
-            results["failed"].append({"channel_id": channel_id, "error": "Channel not found"})
-            continue
-        
-        try:
-            if request.operation == "restart":
-                # Stop then start
-                subprocess.run(
-                    ["systemctl", "restart", f"rist-channel-{channel_id}.service"],
-                    check=True,
-                    timeout=30
-                )
-                results["success"].append(channel_id)
-                logger.info(f"Restarted channel {channel_id}")
-                
-            elif request.operation == "start":
-                subprocess.run(["systemctl", "enable", f"rist-channel-{channel_id}.service"], check=True)
-                subprocess.run(["systemctl", "start", f"rist-channel-{channel_id}.service"], check=True)
-                results["success"].append(channel_id)
-                logger.info(f"Started channel {channel_id}")
-                
-            elif request.operation == "stop":
-                subprocess.run(["systemctl", "stop", f"rist-channel-{channel_id}.service"], check=True)
-                subprocess.run(["systemctl", "disable", f"rist-channel-{channel_id}.service"], check=True)
-                results["success"].append(channel_id)
-                logger.info(f"Stopped channel {channel_id}")
-                
-            else:
-                results["failed"].append({"channel_id": channel_id, "error": f"Unknown operation: {request.operation}"})
-                
-        except subprocess.CalledProcessError as e:
-            results["failed"].append({"channel_id": channel_id, "error": str(e)})
-            logger.error(f"Failed to {request.operation} channel {channel_id}: {e}")
-        except subprocess.TimeoutExpired:
-            results["failed"].append({"channel_id": channel_id, "error": "Operation timed out"})
-            logger.error(f"Timeout during {request.operation} of channel {channel_id}")
-    
-    return {
-        "status": "completed",
-        "operation": request.operation,
-        "results": results
-    }
 
 
 @app.delete("/channels/{channel_id}")
