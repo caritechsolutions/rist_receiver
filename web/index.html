@@ -791,6 +791,147 @@
             margin-bottom: 16px;
         }
 
+        /* Checkbox Styles */
+        .channel-checkbox {
+            position: relative;
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .channel-checkbox input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        .channel-checkbox .checkmark {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 20px;
+            height: 20px;
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .channel-checkbox input:hover + .checkmark {
+            border-color: var(--accent-blue);
+        }
+
+        .channel-checkbox input:checked + .checkmark {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .channel-checkbox .checkmark::after {
+            content: '';
+            position: absolute;
+            display: none;
+            left: 6px;
+            top: 2px;
+            width: 5px;
+            height: 10px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
+        .channel-checkbox input:checked + .checkmark::after {
+            display: block;
+        }
+
+        /* Bulk Action Bar */
+        .bulk-action-bar {
+            display: none;
+            align-items: center;
+            gap: 16px;
+            padding: 14px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--accent-blue);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            animation: slideDown 0.2s ease;
+        }
+
+        .bulk-action-bar.visible {
+            display: flex;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .bulk-action-bar .selected-count {
+            font-weight: 600;
+            color: var(--accent-blue);
+            margin-right: 8px;
+        }
+
+        .bulk-action-bar .bulk-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+
+        .bulk-action-bar .btn-bulk {
+            padding: 8px 14px;
+            font-size: 13px;
+        }
+
+        .bulk-action-bar .btn-clear {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .bulk-action-bar .btn-clear:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        /* Select All Checkbox in Toolbar */
+        .select-all-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .select-all-container:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--border-highlight);
+        }
+
+        .select-all-container label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
         /* Responsive */
         @media (max-width: 1200px) {
             .stats-bar {
@@ -962,11 +1103,50 @@
                 <input type="text" id="searchInput" placeholder="Search channels by name, input, or output...">
             </div>
             <div class="filter-buttons">
+                <div class="select-all-container">
+                    <label class="channel-checkbox">
+                        <input type="checkbox" id="selectAllCheckbox" onchange="channelManager.toggleSelectAll(this.checked)">
+                        <span class="checkmark"></span>
+                    </label>
+                    <label for="selectAllCheckbox">Select</label>
+                </div>
                 <button class="filter-btn active" data-filter="all">All</button>
                 <button class="filter-btn" data-filter="running">Running</button>
                 <button class="filter-btn" data-filter="stopped">Stopped</button>
                 <button class="filter-btn" data-filter="error">Errors</button>
             </div>
+        </div>
+
+        <!-- Bulk Action Bar -->
+        <div class="bulk-action-bar" id="bulkActionBar">
+            <span class="selected-count"><span id="selectedCount">0</span> selected</span>
+            <div class="bulk-actions">
+                <button class="btn btn-secondary btn-bulk" onclick="channelManager.bulkOperation('start')">
+                    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    Start
+                </button>
+                <button class="btn btn-secondary btn-bulk" onclick="channelManager.bulkOperation('stop')">
+                    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <rect x="6" y="6" width="12" height="12"/>
+                    </svg>
+                    Stop
+                </button>
+                <button class="btn btn-primary btn-bulk" onclick="channelManager.bulkOperation('restart')">
+                    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M23 4v6h-6M1 20v-6h6"/>
+                        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                    </svg>
+                    Restart
+                </button>
+            </div>
+            <button class="btn-clear" onclick="channelManager.clearSelection()" title="Clear selection">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
         </div>
 
         <!-- Channel Grid -->
@@ -1276,6 +1456,7 @@
                 this.searchQuery = '';
                 this.pollingInterval = null;
                 this.isPolling = false;
+                this.selectedChannels = new Set();
             }
 
             async fetchChannelMetrics(channelId) {
@@ -1416,6 +1597,7 @@
                 const statusClass = channel.status === 'running' ? 'running' : 
                                   channel.status === 'error' ? 'error' : 'stopped';
                 const isRunning = channel.status === 'running';
+                const isSelected = this.selectedChannels.has(channelId);
                 
                 // Determine signal strength based on metrics
                 let signalClass = 'offline';
@@ -1440,6 +1622,12 @@
                     <div class="channel-card" data-channel-id="${channelId}">
                         <div class="channel-header">
                             <div class="channel-title-section">
+                                <label class="channel-checkbox" onclick="event.stopPropagation()">
+                                    <input type="checkbox" 
+                                           ${isSelected ? 'checked' : ''} 
+                                           onchange="channelManager.toggleChannelSelection('${channelId}', this.checked)">
+                                    <span class="checkmark"></span>
+                                </label>
                                 <div class="channel-status-dot ${statusClass}"></div>
                                 <div class="channel-title">
                                     <h3><a href="stats.html?channel=${channelId}">${channel.name}</a></h3>
@@ -1546,6 +1734,105 @@
             setSearch(query) {
                 this.searchQuery = query;
                 this.renderChannels();
+            }
+
+            // Selection methods
+            toggleChannelSelection(channelId, isSelected) {
+                if (isSelected) {
+                    this.selectedChannels.add(channelId);
+                } else {
+                    this.selectedChannels.delete(channelId);
+                }
+                this.updateBulkActionBar();
+            }
+
+            toggleSelectAll(isSelected) {
+                const filteredChannels = this.getFilteredChannels();
+                if (isSelected) {
+                    filteredChannels.forEach(([id]) => this.selectedChannels.add(id));
+                } else {
+                    filteredChannels.forEach(([id]) => this.selectedChannels.delete(id));
+                }
+                this.renderChannels();
+                this.updateBulkActionBar();
+            }
+
+            clearSelection() {
+                this.selectedChannels.clear();
+                document.getElementById('selectAllCheckbox').checked = false;
+                this.renderChannels();
+                this.updateBulkActionBar();
+            }
+
+            updateBulkActionBar() {
+                const bar = document.getElementById('bulkActionBar');
+                const countEl = document.getElementById('selectedCount');
+                const count = this.selectedChannels.size;
+                
+                countEl.textContent = count;
+                
+                if (count > 0) {
+                    bar.classList.add('visible');
+                } else {
+                    bar.classList.remove('visible');
+                }
+
+                // Update select all checkbox state
+                const filteredChannels = this.getFilteredChannels();
+                const allSelected = filteredChannels.length > 0 && 
+                    filteredChannels.every(([id]) => this.selectedChannels.has(id));
+                document.getElementById('selectAllCheckbox').checked = allSelected;
+            }
+
+            async bulkOperation(operation) {
+                if (this.selectedChannels.size === 0) return;
+
+                const channelIds = Array.from(this.selectedChannels);
+                const channelNames = channelIds.map(id => this.channels[id]?.name || id).join(', ');
+                
+                const operationText = operation === 'restart' ? 'restart' : 
+                                     operation === 'start' ? 'start' : 'stop';
+                
+                if (!confirm(`Are you sure you want to ${operationText} ${channelIds.length} channel(s)?\n\n${channelNames}`)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${API_BASE}/channels/bulk`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            channel_ids: channelIds,
+                            operation: operation
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Bulk operation failed');
+                    }
+
+                    const result = await response.json();
+                    
+                    // Show result
+                    const successCount = result.results.success.length;
+                    const failedCount = result.results.failed.length;
+                    
+                    if (failedCount > 0) {
+                        const failedNames = result.results.failed
+                            .map(f => `${f.channel_id}: ${f.error}`)
+                            .join('\n');
+                        alert(`Operation completed.\nSuccess: ${successCount}\nFailed: ${failedCount}\n\nFailed channels:\n${failedNames}`);
+                    }
+
+                    // Clear selection and reload
+                    this.clearSelection();
+                    await this.loadChannels();
+                    
+                } catch (error) {
+                    console.error('Bulk operation error:', error);
+                    alert(`Bulk operation failed: ${error.message}`);
+                }
             }
 
             startPolling(interval = 5000) {
