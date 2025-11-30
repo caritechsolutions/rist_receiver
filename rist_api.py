@@ -566,20 +566,18 @@ def update_mediamtx_config():
         # Disable protocols we don't need
         "rtsp": False,
         "rtmp": False,
-        "hls": False,
         "srt": False,
+        "webrtc": False,
         
-        # WebRTC settings
-        "webrtc": True,
-        "webrtcAddress": ":8889",
-        "webrtcEncryption": False,
-        "webrtcLocalUDPAddress": ":8189",
-        "webrtcLocalTCPAddress": ":8189",
-        
-        # ICE servers
-        "webrtcICEServers2": [
-            {"url": "stun:stun.l.google.com:19302"}
-        ],
+        # HLS settings - works with any codec
+        "hls": True,
+        "hlsAddress": ":8889",
+        "hlsAllowOrigin": "*",
+        "hlsVariant": "lowLatency",
+        "hlsSegmentCount": 7,
+        "hlsSegmentDuration": "1s",
+        "hlsPartDuration": "200ms",
+        "hlsSegmentMaxSize": "50M",
         
         # Path defaults
         "pathDefaults": {
