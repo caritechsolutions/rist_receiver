@@ -170,18 +170,26 @@ kill_processes_using_directory() {
 setup_web() {
     echo "Setting up web directory..."
     
-    # Stop services before clearing web directory
+    # Stop services before unmounting
     stop_services
     
-    # Unmount content directory if it was mounted (from older installations)
+    # Unmount content directory if it's mounted
     if mountpoint -q /var/www/html/content; then
-        echo "Unmounting old content directory..."
+        echo "Unmounting content directory..."
+        # Try to find and kill processes using the directory
         kill_processes_using_directory "/var/www/html/content"
-        umount -l /var/www/html/content 2>/dev/null || true
+        
+        # Try normal unmount
+        umount /var/www/html/content 2>/dev/null || {
+            echo "Normal unmount failed, trying force unmount..."
+            umount -f /var/www/html/content 2>/dev/null || {
+                echo "Force unmount failed, trying lazy unmount..."
+                umount -l /var/www/html/content 2>/dev/null || {
+                    echo "WARNING: Could not unmount directory. Continuing anyway..."
+                }
+            }
+        }
     fi
-    
-    # Remove old fstab entry if present
-    sed -i '/\/var\/www\/html\/content/d' /etc/fstab 2>/dev/null || true
     
     echo "Clearing web directory..."
     rm -rf /var/www/html/*
@@ -189,9 +197,31 @@ setup_web() {
     echo "Copying web files..."
     cp -r /root/rist/web/* /var/www/html/
     
+    # Create content directory if it doesn't exist
+    echo "Creating content directory..."
+    mkdir -p /var/www/html/content
+    
     # Set permissions
     echo "Setting web permissions..."
-    chmod -R 755 /var/www/html
+    chmod -R 777 /var/www/html
+}
+
+# Configure tmpfs mount
+setup_tmpfs() {
+    echo "Setting up tmpfs mount..."
+    
+    # Unmount if already mounted
+    if mountpoint -q /var/www/html/content; then
+        umount /var/www/html/content
+    fi
+    
+    # Mount tmpfs
+    mount -t tmpfs -o size=1G tmpfs /var/www/html/content
+    
+    # Add to fstab if not already present
+    if ! grep -q "/var/www/html/content" /etc/fstab; then
+        echo "tmpfs   /var/www/html/content   tmpfs   defaults,size=1G   0   0" >> /etc/fstab
+    fi
 }
 
 # Verify config
@@ -319,66 +349,6 @@ start_services() {
     fi
 }
 
-# Install MediaMTX for WebRTC streaming
-install_mediamtx() {
-    echo "Installing MediaMTX..."
-    
-    # Create directory
-    mkdir -p /opt/mediamtx
-    cd /opt/mediamtx
-    
-    # Detect architecture
-    ARCH=$(uname -m)
-    case $ARCH in
-        x86_64)
-            MTX_ARCH="linux_amd64"
-            ;;
-        aarch64)
-            MTX_ARCH="linux_arm64v8"
-            ;;
-        armv7l)
-            MTX_ARCH="linux_armv7"
-            ;;
-        *)
-            echo "Unsupported architecture: $ARCH"
-            exit 1
-            ;;
-    esac
-    
-    # Get latest release version
-    LATEST_VERSION=$(curl -s https://api.github.com/repos/bluenviron/mediamtx/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
-    
-    if [ -z "$LATEST_VERSION" ]; then
-        echo "Failed to get latest MediaMTX version, using v1.9.3"
-        LATEST_VERSION="v1.9.3"
-    fi
-    
-    echo "Downloading MediaMTX ${LATEST_VERSION} for ${MTX_ARCH}..."
-    
-    # Download and extract
-    curl -L "https://github.com/bluenviron/mediamtx/releases/download/${LATEST_VERSION}/mediamtx_${LATEST_VERSION}_${MTX_ARCH}.tar.gz" -o mediamtx.tar.gz
-    tar -xzf mediamtx.tar.gz
-    rm mediamtx.tar.gz
-    
-    # Make executable
-    chmod +x mediamtx
-    
-    # Copy base config from rist installation
-    if [ -f "/root/rist/mediamtx.yml" ]; then
-        cp /root/rist/mediamtx.yml /opt/mediamtx/mediamtx.yml
-    fi
-    
-    # Install systemd service
-    cp /root/rist/services/mediamtx.service /etc/systemd/system/
-    
-    # Enable and start service
-    systemctl daemon-reload
-    systemctl enable mediamtx.service
-    systemctl start mediamtx.service
-    
-    echo "MediaMTX installed successfully"
-}
-
 # Main installation flow
 main() {
     check_root
@@ -388,10 +358,10 @@ main() {
     clone_repo
     verify_config
     setup_web
+    setup_tmpfs
     setup_service
     setup_logrotate
     install_wireguard
-    install_mediamtx
     start_services
     
     echo ""
@@ -407,8 +377,7 @@ main() {
     echo ""
     echo "Please change your password after first login!"
     echo ""
-    echo "WebRTC streams available at: http://$(hostname -I | awk '{print $1}'):8889/{channel_id}"
-    echo "Check service status with: systemctl status rist-api mediamtx"
+    echo "Check service status with: systemctl status rist-api"
     echo ""
 }
 
