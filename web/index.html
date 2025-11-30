@@ -1809,7 +1809,9 @@
                     });
 
                     if (!response.ok) {
-                        throw new Error('Bulk operation failed');
+                        const errorData = await response.json().catch(() => ({}));
+                        console.error('Bulk operation response:', errorData);
+                        throw new Error(errorData.detail || `Server returned ${response.status}`);
                     }
 
                     const result = await response.json();
