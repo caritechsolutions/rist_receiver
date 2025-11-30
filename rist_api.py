@@ -1129,52 +1129,44 @@ def save_multicast_config(config: MulticastConfig):
     try:
         logger.info(f"Saving multicast config: bridge={config.bridge_name}, members={config.bridge_members}")
         
-        # Build netplan configuration
-        netplan_config = {
-            "network": {
-                "version": 2,
-                "renderer": "networkd"
-            }
-        }
-        
         if config.bridge_members:
-            # Create bridge configuration
-            netplan_config["network"]["bridges"] = {
-                config.bridge_name: {
-                    "interfaces": config.bridge_members,
-                    "addresses": [config.bridge_address],
-                    "routes": [
-                        {
-                            "to": config.multicast_route,
-                            "via": "0.0.0.0",
-                            "on-link": True
+            # Build netplan configuration - ONLY define the bridge
+            # Do NOT redefine ethernet interfaces - let them keep their existing config
+            netplan_config = {
+                "network": {
+                    "version": 2,
+                    "bridges": {
+                        config.bridge_name: {
+                            "interfaces": config.bridge_members,
+                            "addresses": [config.bridge_address],
+                            "routes": [
+                                {
+                                    "to": config.multicast_route,
+                                    "scope": "link"
+                                }
+                            ],
+                            "parameters": {
+                                "stp": False,
+                                "forward-delay": 0
+                            }
                         }
-                    ],
-                    "parameters": {
-                        "stp": False,
-                        "forward-delay": 0
                     }
                 }
             }
             
-            # Mark member interfaces (they shouldn't have their own IP when in bridge)
-            netplan_config["network"]["ethernets"] = {}
-            for member in config.bridge_members:
-                # Skip virtual interfaces
-                if not member.startswith(('wg', 'veth', 'docker', 'vir', 'br')):
-                    netplan_config["network"]["ethernets"][member] = {
-                        "dhcp4": False,
-                        "dhcp6": False
-                    }
-        
-        # Write netplan file
-        os.makedirs(os.path.dirname(NETPLAN_MCAST_FILE), exist_ok=True)
-        
-        with open(NETPLAN_MCAST_FILE, 'w') as f:
-            yaml.dump(netplan_config, f, default_flow_style=False, sort_keys=False)
-        
-        # Set proper permissions
-        os.chmod(NETPLAN_MCAST_FILE, 0o600)
+            # Write netplan file
+            os.makedirs(os.path.dirname(NETPLAN_MCAST_FILE), exist_ok=True)
+            
+            with open(NETPLAN_MCAST_FILE, 'w') as f:
+                yaml.dump(netplan_config, f, default_flow_style=False, sort_keys=False)
+            
+            # Set proper permissions
+            os.chmod(NETPLAN_MCAST_FILE, 0o600)
+        else:
+            # No bridge members - remove the config file if it exists
+            if os.path.exists(NETPLAN_MCAST_FILE):
+                os.remove(NETPLAN_MCAST_FILE)
+                logger.info("Removed multicast config file (no bridge members)")
         
         # Apply netplan configuration
         try:
