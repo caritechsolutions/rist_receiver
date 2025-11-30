@@ -26,9 +26,6 @@ import secrets
 previous_network_stats = {}
 previous_network_timestamp = 0
 
-channel_monitors: Dict[str, asyncio.Task] = {}
-channel_last_active: Dict[str, float] = {}
-
 # Session storage (in-memory)
 sessions: Dict[str, dict] = {}
 SESSION_TIMEOUT_HOURS = 24
@@ -60,6 +57,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="RIST Receiver API")
 CONFIG_FILE = "receiver_config.yaml"
 SERVICE_DIR = "/etc/systemd/system"
+MEDIAMTX_CONFIG_FILE = "/opt/mediamtx/mediamtx.yml"
 
 
 # =============================================================================
@@ -530,14 +528,124 @@ def reload_systemd():
         logger.error(f"Failed to reload systemd: {e.stderr.decode()}")
         raise HTTPException(status_code=500, detail="Failed to reload systemd")
 
+
+def update_mediamtx_config():
+    """
+    Update MediaMTX configuration based on current running channels.
+    Regenerates the paths section with UDP sources for each running channel.
+    """
+    config = load_config()
+    
+    # Build paths configuration for running channels
+    paths = {}
+    for channel_id, channel in config.get("channels", {}).items():
+        # Parse the output URL to get multicast IP and port
+        # Format: udp://224.2.2.2:10000
+        output = channel.get("output", "")
+        if output.startswith("udp://"):
+            # Extract IP and port from udp://IP:PORT
+            addr_part = output.replace("udp://", "")
+            if ":" in addr_part:
+                ip, port = addr_part.split(":")
+                # Create path for this channel using UDP MPEG-TS source
+                paths[channel_id] = {
+                    "source": f"udp+mpegts://{ip}:{port}",
+                    "sourceOnDemand": False  # Always listen since RIST is pushing
+                }
+                logger.debug(f"Added MediaMTX path for {channel_id}: udp+mpegts://{ip}:{port}")
+    
+    # Build complete MediaMTX configuration
+    mediamtx_config = {
+        "logLevel": "info",
+        "logDestinations": ["stdout"],
+        
+        # API settings
+        "api": True,
+        "apiAddress": ":9997",
+        
+        # Disable protocols we don't need
+        "rtsp": False,
+        "rtmp": False,
+        "hls": False,
+        "srt": False,
+        
+        # WebRTC settings
+        "webrtc": True,
+        "webrtcAddress": ":8889",
+        "webrtcEncryption": False,
+        "webrtcLocalUDPAddress": ":8189",
+        "webrtcLocalTCPAddress": ":8189",
+        
+        # ICE servers
+        "webrtcICEServers2": [
+            {"url": "stun:stun.l.google.com:19302"}
+        ],
+        
+        # Path defaults
+        "pathDefaults": {
+            "sourceOnDemandStartTimeout": "10s",
+            "sourceOnDemandCloseAfter": "10s"
+        },
+        
+        # Dynamic paths
+        "paths": paths if paths else {}
+    }
+    
+    try:
+        os.makedirs(os.path.dirname(MEDIAMTX_CONFIG_FILE), exist_ok=True)
+        with open(MEDIAMTX_CONFIG_FILE, 'w') as f:
+            yaml.safe_dump(mediamtx_config, f, default_flow_style=False)
+        logger.info(f"Updated MediaMTX config with {len(paths)} paths")
+        
+        # Reload MediaMTX configuration (if running)
+        reload_mediamtx()
+        
+    except Exception as e:
+        logger.error(f"Failed to update MediaMTX config: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update MediaMTX config: {str(e)}")
+
+
+def reload_mediamtx():
+    """
+    Signal MediaMTX to reload its configuration.
+    MediaMTX supports hot reload via its API.
+    """
+    try:
+        # Check if MediaMTX is running
+        result = subprocess.run(
+            ["systemctl", "is-active", "mediamtx.service"],
+            capture_output=True,
+            text=True
+        )
+        
+        if result.stdout.strip() == "active":
+            # MediaMTX supports config reload via API
+            try:
+                response = requests.post("http://localhost:9997/v3/config/global/patch", 
+                                        json={}, timeout=5)
+                if response.status_code == 200:
+                    logger.info("MediaMTX configuration reloaded via API")
+                else:
+                    # Fallback to service restart
+                    subprocess.run(["systemctl", "restart", "mediamtx.service"], check=True)
+                    logger.info("MediaMTX service restarted")
+            except requests.RequestException:
+                # API not responding, restart service
+                subprocess.run(["systemctl", "restart", "mediamtx.service"], check=True)
+                logger.info("MediaMTX service restarted (API unavailable)")
+        else:
+            logger.debug("MediaMTX service not running, skipping reload")
+            
+    except Exception as e:
+        logger.warning(f"Could not reload MediaMTX: {e}")
+
 def generate_service_file(channel_id: str, channel: Dict):
-    """Generate separate systemd service files for RIST and FFmpeg"""
+    """Generate systemd service file for RIST channel"""
     input_url = channel["input"]
     if channel["settings"].get("virt_src_port"):
         input_url += f"?virt-dst-port={channel['settings']['virt_src_port']}"
 
     log_port = channel['metrics_port'] + 1000
-    stream_path = f"/var/www/html/content/{channel['name']}"
     
     # RIST service components
     rist_cmd_parts = [
@@ -566,33 +674,13 @@ def generate_service_file(channel_id: str, channel: Dict):
     # RIST Service
     rist_service = f"""[Unit]
 Description=RIST Channel {channel['name']}
-After=network.target
+After=network.target mediamtx.service
 
 [Service]
 Type=simple
 ExecStart={' '.join(rist_cmd_parts)}
 Restart=always
 RestartSec=3
-
-
-[Install]
-WantedBy=multi-user.target
-"""
-
-    # FFmpeg Service for diagnostic preview
-    ffmpeg_service = f"""[Unit]
-Description=FFmpeg HLS for Channel {channel['name']}
-After=rist-channel-{channel_id}.service
-BindsTo=rist-channel-{channel_id}.service
-
-[Service]
-Type=simple
-ExecStartPre=/bin/bash -c "mkdir -p {stream_path} && rm -f {stream_path}/*.ts {stream_path}/*.m3u8"
-ExecStart=ffmpeg -i {channel['output']} -c copy -hls_time 5 -hls_list_size 5 -hls_flags delete_segments {stream_path}/playlist.m3u8
-ExecStopPost=/bin/bash -c "rm -f {stream_path}/*.ts {stream_path}/*.m3u8"
-Restart=always
-RestartSec=3
-
 
 [Install]
 WantedBy=multi-user.target
@@ -608,15 +696,6 @@ WantedBy=multi-user.target
     except Exception as e:
         logger.error(f"Failed to write RIST service file: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create RIST service file")
-
-    # Write FFmpeg service
-    ffmpeg_file = f"{SERVICE_DIR}/ffmpeg-{channel_id}.service"
-    try:
-        with open(ffmpeg_file, "w") as f:
-            f.write(ffmpeg_service)
-    except Exception as e:
-        logger.error(f"Failed to write FFmpeg service file: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to create FFmpeg service file")
 
     subprocess.run(["systemctl", "daemon-reload"], check=True)
     
@@ -824,25 +903,13 @@ def startup_event():
     @app.get("/")
     def wait_for_startup():
         return {"status": "ready"}
-
-    import threading
-    import time
-    import requests
-
-    def perform_keepalive():
-        # Wait a bit to ensure server is fully up
-        time.sleep(2)
-        
-        config = load_config()
-        for channel_id in config["channels"]:
-            try:
-                response = requests.post(f"http://localhost:5000/channels/{channel_id}/keepalive")
-                print(f"Keepalive for {channel_id}: {response.status_code}")
-            except Exception as e:
-                print(f"Keepalive failed for channel {channel_id}: {str(e)}")
-
-    # Run keepalive in a separate thread
-    threading.Thread(target=perform_keepalive, daemon=True).start()
+    
+    # Update MediaMTX config on startup to ensure paths are correct
+    try:
+        update_mediamtx_config()
+        logger.info("MediaMTX configuration updated on startup")
+    except Exception as e:
+        logger.warning(f"Could not update MediaMTX config on startup: {e}")
 
 
 @app.get("/system/hostname")
@@ -1360,6 +1427,10 @@ def create_channel(channel_id: str, channel: Channel):
     save_config(config)
     
     generate_service_file(channel_id, channel_dict)
+    
+    # Update MediaMTX configuration to include the new channel
+    update_mediamtx_config()
+    
     return channel_dict
 
 @app.put("/channels/{channel_id}")
@@ -1377,11 +1448,13 @@ def update_channel(channel_id: str, channel: Channel):
     
     generate_service_file(channel_id, channel_dict)
     
+    # Update MediaMTX configuration
+    update_mediamtx_config()
+    
     status, _ = get_channel_status(channel_id)
     if status == "running":
         try:
             subprocess.run(["systemctl", "restart", f"rist-channel-{channel_id}.service"], check=True)
-            channel_keepalive(channel_id)  # This will start FFmpeg if needed
         except subprocess.CalledProcessError as e:
             raise HTTPException(status_code=500, 
                           detail=f"Failed to restart services: {e.stderr}")
@@ -1390,29 +1463,30 @@ def update_channel(channel_id: str, channel: Channel):
 
 @app.put("/channels/{channel_id}/start")
 def start_channel(channel_id: str):
-    """Start RIST and FFmpeg services"""
+    """Start RIST channel service"""
     config = load_config()
     if channel_id not in config["channels"]:
         raise HTTPException(status_code=404)
     
     try:
+        # Update MediaMTX config to include this channel's path
+        update_mediamtx_config()
+        
         # Enable service so it auto-starts on reboot
         subprocess.run(["systemctl", "enable", f"rist-channel-{channel_id}.service"], check=True)
         subprocess.run(["systemctl", "start", f"rist-channel-{channel_id}.service"], check=True)
-        channel_keepalive(channel_id)  # This will start FFmpeg if needed
         return {"status": "started"}
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=f"Failed to start services: {e.stderr}")
 
 @app.put("/channels/{channel_id}/stop")
 def stop_channel(channel_id: str):
-    """Stop RIST and FFmpeg services"""
+    """Stop RIST channel service"""
     config = load_config()
     if channel_id not in config["channels"]:
         raise HTTPException(status_code=404)
     
     try:
-        # FFmpeg will stop automatically due to BindsTo
         subprocess.run(["systemctl", "stop", f"rist-channel-{channel_id}.service"], check=True)
         # Disable service so it won't auto-start on reboot
         subprocess.run(["systemctl", "disable", f"rist-channel-{channel_id}.service"], check=True)
@@ -1429,106 +1503,26 @@ def delete_channel(channel_id: str):
         raise HTTPException(status_code=404)
     
     try:
-        # Stop and disable both services
-        for service in [f"rist-channel-{channel_id}.service", f"ffmpeg-{channel_id}.service"]:
-            try:
-                subprocess.run(["systemctl", "stop", service], check=True)
-                subprocess.run(["systemctl", "disable", service], check=True)
-                os.remove(f"{SERVICE_DIR}/{service}")
-            except Exception as e:
-                logger.error(f"Failed to remove service {service}: {str(e)}")
+        # Stop and disable RIST service
+        service = f"rist-channel-{channel_id}.service"
+        try:
+            subprocess.run(["systemctl", "stop", service], check=True)
+            subprocess.run(["systemctl", "disable", service], check=True)
+            service_file = f"{SERVICE_DIR}/{service}"
+            if os.path.exists(service_file):
+                os.remove(service_file)
+        except Exception as e:
+            logger.error(f"Failed to remove service {service}: {str(e)}")
         
         del config["channels"][channel_id]
         save_config(config)
+        
+        # Update MediaMTX config to remove this channel's path
+        update_mediamtx_config()
+        
         return {"status": "deleted"}
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to delete channel")
-
-
-async def stop_ffmpeg(channel_id: str):
-    """Stop FFmpeg service for a channel"""
-    try:
-        subprocess.run(["systemctl", "stop", f"ffmpeg-{channel_id}.service"], check=True)
-        logger.info(f"Stopped FFmpeg for channel {channel_id}")
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to stop FFmpeg for channel {channel_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to stop FFmpeg service: {e.stderr}")
-
-async def start_ffmpeg(channel_id: str):
-    """Start FFmpeg service for a channel"""
-    try:
-        subprocess.run(["systemctl", "start", f"ffmpeg-{channel_id}.service"], check=True)
-        logger.info(f"Started FFmpeg for channel {channel_id}")
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to start FFmpeg for channel {channel_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to start FFmpeg service: {e.stderr}")
-
-def is_ffmpeg_running(channel_id: str) -> bool:
-    """Check if FFmpeg service is running"""
-    try:
-        result = subprocess.run(
-            ["systemctl", "is-active", f"ffmpeg-{channel_id}.service"],
-            capture_output=True,
-            text=True
-        )
-        return result.stdout.strip() == "active"
-    except Exception:
-        return False
-
-async def monitor_channel_activity(channel_id: str):
-    """Monitor channel activity and stop FFmpeg if inactive"""
-    logger.info(f"Starting activity monitor for channel {channel_id}")
-    try:
-        while True:
-            if time.time() - channel_last_active[channel_id] > 120:
-                logger.info(f"Channel {channel_id} inactive, stopping FFmpeg")
-                await stop_ffmpeg(channel_id)
-                del channel_monitors[channel_id]
-                del channel_last_active[channel_id]
-                break
-            await asyncio.sleep(30)
-    except Exception as e:
-        logger.error(f"Error in monitor for channel {channel_id}: {e}")
-        # Cleanup in case of error
-        if channel_id in channel_monitors:
-            del channel_monitors[channel_id]
-        if channel_id in channel_last_active:
-            del channel_last_active[channel_id]
-
-@app.post("/channels/{channel_id}/keepalive")
-async def channel_keepalive(channel_id: str):
-    """Handle keepalive request for channel"""
-    config = load_config()
-    if channel_id not in config["channels"]:
-        raise HTTPException(status_code=404, detail="Channel not found")
-        
-    channel_last_active[channel_id] = time.time()
-    
-    if channel_id not in channel_monitors:
-        # Start FFmpeg if not running
-        if not is_ffmpeg_running(channel_id):
-            await start_ffmpeg(channel_id)
-        # Start new monitor task
-        channel_monitors[channel_id] = asyncio.create_task(
-            monitor_channel_activity(channel_id)
-        )
-        logger.info(f"Started new monitor for channel {channel_id}")
-    
-    return {"status": "ok", "timestamp": datetime.now().isoformat()}
-
-
-@app.put("/channels/{channel_id}/ffmpeg/restart")
-def restart_ffmpeg(channel_id: str):
-    """Restart FFmpeg service for a channel"""
-    config = load_config()
-    if channel_id not in config["channels"]:
-        raise HTTPException(status_code=404)
-    
-    try:
-        subprocess.run(["systemctl", "restart", f"ffmpeg-{channel_id}.service"], check=True)
-        return {"status": "restarted"}
-    except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to restart FFmpeg service: {e.stderr}")
 
 
 @app.get("/channels/{channel_id}/metrics")
@@ -1820,14 +1814,14 @@ async def restore_config(backup_data: dict = Body(...)):
             if channel_id not in new_channels:
                 logger.info(f"Removing channel {channel_id} (not in backup)")
                 # Remove service files
-                for service in [f"rist-channel-{channel_id}.service", f"ffmpeg-{channel_id}.service"]:
-                    service_path = f"{SERVICE_DIR}/{service}"
-                    try:
-                        subprocess.run(["systemctl", "disable", service], capture_output=True)
-                        if os.path.exists(service_path):
-                            os.remove(service_path)
-                    except Exception as e:
-                        logger.warning(f"Failed to remove service {service}: {e}")
+                service = f"rist-channel-{channel_id}.service"
+                service_path = f"{SERVICE_DIR}/{service}"
+                try:
+                    subprocess.run(["systemctl", "disable", service], capture_output=True)
+                    if os.path.exists(service_path):
+                        os.remove(service_path)
+                except Exception as e:
+                    logger.warning(f"Failed to remove service {service}: {e}")
         
         # Step 4: Save new receiver config
         save_config(backup_data["receiver_config"])
@@ -1891,14 +1885,14 @@ async def revert_config():
         for channel_id in current_config.get("channels", {}):
             if channel_id not in bak_channels:
                 logger.info(f"Removing channel {channel_id} (not in .bak)")
-                for service in [f"rist-channel-{channel_id}.service", f"ffmpeg-{channel_id}.service"]:
-                    service_path = f"{SERVICE_DIR}/{service}"
-                    try:
-                        subprocess.run(["systemctl", "disable", service], capture_output=True)
-                        if os.path.exists(service_path):
-                            os.remove(service_path)
-                    except Exception as e:
-                        logger.warning(f"Failed to remove service {service}: {e}")
+                service = f"rist-channel-{channel_id}.service"
+                service_path = f"{SERVICE_DIR}/{service}"
+                try:
+                    subprocess.run(["systemctl", "disable", service], capture_output=True)
+                    if os.path.exists(service_path):
+                        os.remove(service_path)
+                except Exception as e:
+                    logger.warning(f"Failed to remove service {service}: {e}")
         
         # Step 4: Restore from .bak files
         import shutil
