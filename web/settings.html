@@ -953,7 +953,14 @@ Endpoint = vpn.example.com:51820"></textarea>
                 });
                 
                 if (response.ok) {
-                    showMcastAlert('success', 'Multicast configuration applied successfully');
+                    const result = await response.json();
+                    let message = 'Multicast configuration applied successfully';
+                    
+                    if (result.restarted_channels && result.restarted_channels.length > 0) {
+                        message += `. Restarted ${result.restarted_channels.length} channel(s): ${result.restarted_channels.join(', ')}`;
+                    }
+                    
+                    showMcastAlert('success', message);
                     loadMulticastConfig();
                 } else {
                     const error = await response.json();
