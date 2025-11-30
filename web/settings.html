@@ -819,16 +819,18 @@ Endpoint = vpn.example.com:51820"></textarea>
                     </div>
                 `;
             } else {
-                availableList.innerHTML = available.map(iface => `
+                availableList.innerHTML = available.map(iface => {
+                    const ipv4 = iface.ipv4 && iface.ipv4.length > 0 ? iface.ipv4[0].address : 'No IP';
+                    return `
                     <div class="interface-item ${selectedAvailable === iface.name ? 'selected' : ''}" 
                          onclick="selectAvailable('${iface.name}')">
                         <div>
                             <div class="name">${iface.name}</div>
-                            <div class="info">${iface.ipv4 || 'No IP'}</div>
+                            <div class="info">${ipv4}</div>
                         </div>
                         <span class="type-badge">${getInterfaceType(iface.name)}</span>
                     </div>
-                `).join('');
+                `}).join('');
             }
             
             if (bridgeMembers.length === 0) {
@@ -843,13 +845,14 @@ Endpoint = vpn.example.com:51820"></textarea>
                 `;
             } else {
                 bridgeList.innerHTML = bridgeMembers.map(name => {
-                    const iface = allInterfaces.find(i => i.name === name) || { name, ipv4: '' };
+                    const iface = allInterfaces.find(i => i.name === name) || { name, ipv4: [] };
+                    const ipv4 = iface.ipv4 && iface.ipv4.length > 0 ? iface.ipv4[0].address : 'Bridge member';
                     return `
                         <div class="interface-item ${selectedBridge === name ? 'selected' : ''}" 
                              onclick="selectBridge('${name}')">
                             <div>
                                 <div class="name">${name}</div>
-                                <div class="info">${iface.ipv4 || 'Bridge member'}</div>
+                                <div class="info">${ipv4}</div>
                             </div>
                             <span class="type-badge">${getInterfaceType(name)}</span>
                         </div>
