@@ -573,10 +573,9 @@ def update_mediamtx_config():
         "hls": True,
         "hlsAddress": ":8889",
         "hlsAllowOrigin": "*",
-        "hlsVariant": "lowLatency",
-        "hlsSegmentCount": 7,
-        "hlsSegmentDuration": "1s",
-        "hlsPartDuration": "200ms",
+        "hlsVariant": "mpegts",
+        "hlsSegmentCount": 3,
+        "hlsSegmentDuration": "2s",
         "hlsSegmentMaxSize": "50M",
         
         # Path defaults
