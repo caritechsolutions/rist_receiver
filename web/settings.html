@@ -6,18 +6,18 @@
     <title>Settings - RIST Manager</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-primary: #0a0e14;
-            --bg-secondary: #111820;
-            --bg-tertiary: #1a2332;
-            --bg-hover: #232d3f;
-            --border-color: #2a3a4d;
-            --border-highlight: #3d5a80;
-            --text-primary: #e8eef4;
-            --text-secondary: #8899a8;
-            --text-muted: #5a6a7a;
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tertiary: #1a1a24;
+            --bg-hover: #22222e;
+            --border-color: #2a2a3a;
+            --border-highlight: #3a3a4a;
+            --text-primary: #f0f0f0;
+            --text-secondary: #a0a0a0;
+            --text-muted: #606060;
             --accent-blue: #3b82f6;
             --accent-blue-dim: #2563eb;
             --accent-green: #10b981;
@@ -26,7 +26,6 @@
             --accent-red-dim: rgba(239, 68, 68, 0.15);
             --accent-yellow: #f59e0b;
             --accent-yellow-dim: rgba(245, 158, 11, 0.15);
-            --accent-purple: #8b5cf6;
         }
 
         * {
@@ -36,35 +35,20 @@
         }
 
         body {
-            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
             min-height: 100vh;
-            line-height: 1.5;
-        }
-
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: 
-                radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.03) 0%, transparent 50%),
-                radial-gradient(circle at 80% 50%, rgba(16, 185, 129, 0.03) 0%, transparent 50%);
-            pointer-events: none;
-            z-index: -1;
-        }
-
-        .app-container {
-            max-width: 1400px;
-            margin: 0 auto;
             padding: 24px;
         }
 
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
         /* Header */
-        .header {
+        header {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -179,13 +163,32 @@
             background: #0ea472;
         }
 
+        .btn-danger {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
         .btn-warning {
             background: var(--accent-yellow);
-            color: #000;
+            color: black;
         }
 
         .btn-warning:hover {
             background: #d97706;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         /* Panels */
@@ -244,12 +247,48 @@
             color: var(--accent-red);
         }
 
+        .status-badge.pending {
+            background: var(--accent-yellow-dim);
+            color: var(--accent-yellow);
+        }
+
         .status-badge::before {
             content: '';
             width: 8px;
             height: 8px;
             border-radius: 50%;
             background: currentColor;
+        }
+
+        /* Alert */
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .alert.visible {
+            display: block;
+        }
+
+        .alert-success {
+            background: var(--accent-green-dim);
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+        }
+
+        .alert-error {
+            background: var(--accent-red-dim);
+            color: var(--accent-red);
+            border: 1px solid var(--accent-red);
+        }
+
+        .alert-warning {
+            background: var(--accent-yellow-dim);
+            color: var(--accent-yellow);
+            border: 1px solid var(--accent-yellow);
         }
 
         /* Form Elements */
@@ -266,7 +305,8 @@
         }
 
         .form-group input,
-        .form-group textarea {
+        .form-group textarea,
+        .form-group select {
             width: 100%;
             padding: 12px 16px;
             background: var(--bg-primary);
@@ -279,7 +319,8 @@
         }
 
         .form-group input:focus,
-        .form-group textarea:focus {
+        .form-group textarea:focus,
+        .form-group select:focus {
             outline: none;
             border-color: var(--accent-blue);
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
@@ -300,6 +341,50 @@
             font-size: 12px;
             color: var(--text-muted);
             margin-top: 6px;
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+        }
+
+        .toggle-switch input {
+            display: none;
+        }
+
+        .toggle-slider {
+            width: 44px;
+            height: 24px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .toggle-slider::after {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: all 0.2s ease;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .toggle-switch input:checked + .toggle-slider::after {
+            left: 22px;
+            background: white;
         }
 
         /* Interface Selector */
@@ -371,19 +456,20 @@
             color: var(--text-secondary);
         }
 
+        /* Arrow Buttons */
         .arrow-buttons {
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            padding-top: 80px;
+            gap: 8px;
+            padding-top: 60px;
         }
 
         .arrow-btn {
+            width: 40px;
+            height: 40px;
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 44px;
-            height: 44px;
             background: var(--bg-tertiary);
             border: 1px solid var(--border-color);
             border-radius: 8px;
@@ -393,20 +479,9 @@
         }
 
         .arrow-btn:hover {
-            background: var(--accent-blue);
+            background: var(--bg-hover);
+            color: var(--accent-blue);
             border-color: var(--accent-blue);
-            color: white;
-        }
-
-        .arrow-btn:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-
-        .arrow-btn:disabled:hover {
-            background: var(--bg-tertiary);
-            border-color: var(--border-color);
-            color: var(--text-secondary);
         }
 
         .arrow-btn svg {
@@ -414,130 +489,297 @@
             height: 20px;
         }
 
-        /* Bridge Config */
-        .bridge-config {
-            background: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
+        /* Config Row */
+        .config-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
         }
 
+        /* Bridge Config */
         .bridge-config h4 {
             font-size: 14px;
             font-weight: 600;
-            margin-bottom: 16px;
             color: var(--text-secondary);
+            margin-bottom: 16px;
         }
 
-        .config-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 16px;
-        }
-
-        .config-row .form-group {
-            margin-bottom: 0;
-        }
-
-        /* Hostname Config */
-        .hostname-config {
-            display: flex;
-            gap: 16px;
-            align-items: flex-end;
-        }
-
-        .hostname-config .form-group {
-            flex: 1;
-            margin-bottom: 0;
-        }
-
-        .hostname-config .btn-group {
-            display: flex;
-            gap: 8px;
-        }
-
-        /* WireGuard Section */
+        /* WireGuard */
         .wg-actions {
             display: flex;
             gap: 12px;
-            margin-bottom: 16px;
+            margin-bottom: 20px;
         }
 
         .wg-status-detail {
-            background: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 16px;
-            margin-top: 16px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
         }
 
         .wg-status-detail h4 {
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 600;
             color: var(--text-secondary);
             margin-bottom: 12px;
         }
 
         .wg-status-detail pre {
+            background: var(--bg-primary);
+            padding: 16px;
+            border-radius: 8px;
             font-family: 'JetBrains Mono', monospace;
             font-size: 12px;
-            color: var(--text-primary);
-            white-space: pre-wrap;
-            word-break: break-all;
+            overflow-x: auto;
+            color: var(--text-secondary);
         }
 
-        /* Alert Messages */
-        .alert {
-            padding: 14px 18px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+        /* Network Configuration Styles */
+        .network-config-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 24px;
+        }
+
+        .interface-sidebar {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .interface-sidebar-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .interface-sidebar-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .interface-sidebar-item {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .interface-sidebar-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .interface-sidebar-item.active {
+            background: rgba(59, 130, 246, 0.15);
+            border-left: 3px solid var(--accent-blue);
+        }
+
+        .interface-sidebar-item .iface-name {
+            font-family: 'JetBrains Mono', monospace;
             font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .interface-sidebar-item .iface-ip {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .interface-sidebar-item .iface-status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .interface-sidebar-item .iface-status.up {
+            background: var(--accent-green);
+        }
+
+        .interface-sidebar-item .iface-status.down {
+            background: var(--accent-red);
+        }
+
+        .interface-config-panel {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .interface-config-panel h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .interface-config-panel h3 .iface-badge {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-tertiary);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .config-section {
+            margin-bottom: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .config-section:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .config-section h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .config-section h4 svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .ip-list {
+            margin-bottom: 12px;
+        }
+
+        .ip-list-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .ip-list-item input {
+            flex: 1;
+        }
+
+        .ip-list-item .btn-icon {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Pending Changes Banner */
+        .pending-banner {
+            background: var(--accent-yellow-dim);
+            border: 1px solid var(--accent-yellow);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
             display: none;
         }
 
-        .alert.visible {
+        .pending-banner.visible {
             display: block;
         }
 
-        .alert-success {
-            background: var(--accent-green-dim);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            color: var(--accent-green);
+        .pending-banner-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
-        .alert-error {
-            background: var(--accent-red-dim);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: var(--accent-red);
-        }
-
-        .alert-warning {
-            background: var(--accent-yellow-dim);
-            border: 1px solid rgba(245, 158, 11, 0.3);
+        .pending-banner-text {
+            display: flex;
+            align-items: center;
+            gap: 12px;
             color: var(--accent-yellow);
         }
 
-        /* Empty State */
+        .pending-banner-text svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .pending-banner-text strong {
+            font-weight: 600;
+        }
+
+        .pending-banner-countdown {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent-yellow);
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .pending-banner-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* DHCP Leases Table */
+        .leases-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .leases-table th,
+        .leases-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .leases-table th {
+            font-weight: 600;
+            color: var(--text-secondary);
+            background: var(--bg-tertiary);
+        }
+
+        .leases-table td {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .leases-table tr:hover td {
+            background: var(--bg-tertiary);
+        }
+
         .empty-state {
             text-align: center;
-            padding: 40px 20px;
+            padding: 40px;
             color: var(--text-muted);
         }
 
         .empty-state svg {
             width: 48px;
             height: 48px;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
             opacity: 0.5;
         }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            .header {
-                flex-direction: column;
-                gap: 16px;
-                align-items: flex-start;
+        @media (max-width: 900px) {
+            .network-config-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .config-row {
+                grid-template-columns: 1fr;
             }
 
             .interface-selector {
@@ -553,30 +795,12 @@
             .arrow-btn svg {
                 transform: rotate(90deg);
             }
-
-            .config-row {
-                grid-template-columns: 1fr;
-            }
-
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-
-            .hostname-config {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .hostname-config .btn-group {
-                justify-content: flex-end;
-            }
         }
     </style>
 </head>
 <body>
-    <div class="app-container">
-        <!-- Header -->
-        <header class="header">
+    <div class="container">
+        <header>
             <div class="header-left">
                 <a href="/" class="back-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -603,50 +827,71 @@
             </div>
         </header>
 
-        <!-- System Settings Panel -->
+        <!-- Pending Changes Banner -->
+        <div class="pending-banner" id="pendingBanner">
+            <div class="pending-banner-content">
+                <div class="pending-banner-text">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    <div>
+                        <strong>Network changes pending confirmation</strong>
+                        <div style="font-size: 12px; margin-top: 4px;">Changes will auto-revert if not confirmed</div>
+                    </div>
+                </div>
+                <div class="pending-banner-countdown" id="pendingCountdown">120</div>
+                <div class="pending-banner-actions">
+                    <button class="btn btn-success" onclick="confirmNetplanChanges()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        Confirm
+                    </button>
+                    <button class="btn btn-danger" onclick="revertNetplanChanges()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/>
+                            <path d="M3 3v5h5"/>
+                        </svg>
+                        Revert Now
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Configuration Panel -->
         <div class="panel">
             <div class="panel-header">
                 <h2>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
-                        <line x1="7" y1="2" x2="7" y2="22"/>
-                        <line x1="17" y1="2" x2="17" y2="22"/>
-                        <line x1="2" y1="12" x2="22" y2="12"/>
-                        <line x1="2" y1="7" x2="7" y2="7"/>
-                        <line x1="2" y1="17" x2="7" y2="17"/>
-                        <line x1="17" y1="7" x2="22" y2="7"/>
-                        <line x1="17" y1="17" x2="22" y2="17"/>
+                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                        <line x1="6" y1="6" x2="6.01" y2="6"/>
+                        <line x1="6" y1="18" x2="6.01" y2="18"/>
                     </svg>
-                    System Settings
+                    Network Configuration
                 </h2>
             </div>
             <div class="panel-body">
-                <div id="systemAlert" class="alert"></div>
+                <div id="netAlert" class="alert"></div>
                 
-                <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary);">Hostname</h4>
-                <p class="form-hint" style="margin-bottom: 16px;">The system hostname identifies this device on the network. Changes require a reboot for all services to recognize the new name.</p>
-                
-                <div class="hostname-config">
-                    <div class="form-group">
-                        <label for="hostnameInput">Hostname</label>
-                        <input type="text" id="hostnameInput" placeholder="e.g. rist-receiver-01" maxlength="63">
+                <div class="network-config-grid">
+                    <!-- Interface List Sidebar -->
+                    <div class="interface-sidebar">
+                        <div class="interface-sidebar-header">Network Interfaces</div>
+                        <div class="interface-sidebar-list" id="interfaceSidebar">
+                            <div class="empty-state">Loading...</div>
+                        </div>
                     </div>
-                    <div class="btn-group">
-                        <button class="btn btn-primary" onclick="saveHostname(false)">
+
+                    <!-- Interface Configuration Panel -->
+                    <div class="interface-config-panel" id="interfaceConfigPanel">
+                        <div class="empty-state">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
-                                <polyline points="17 21 17 13 7 13 7 21"/>
-                                <polyline points="7 3 7 8 15 8"/>
+                                <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
                             </svg>
-                            Save
-                        </button>
-                        <button class="btn btn-warning" onclick="saveHostname(true)" title="Save and reboot the system">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M23 4v6h-6M1 20v-6h6"/>
-                                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-                            </svg>
-                            Save &amp; Reboot
-                        </button>
+                            <div>Select an interface to configure</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -807,11 +1052,18 @@ Endpoint = vpn.example.com:51820"></textarea>
     <script>
         const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
         
-        // Track selected interfaces
+        // Track selected interfaces for multicast
         let selectedAvailable = null;
         let selectedBridge = null;
         let allInterfaces = [];
         let bridgeMembers = [];
+
+        // Network configuration state
+        let netplanInterfaces = [];
+        let selectedInterface = null;
+        let dhcpStatus = null;
+        let pendingExpiry = null;
+        let countdownInterval = null;
 
         // Check authentication
         async function checkAuth() {
@@ -844,7 +1096,7 @@ Endpoint = vpn.example.com:51820"></textarea>
             window.location.href = '/login.html';
         }
 
-        // Load hostname for header display
+        // Load hostname
         async function loadHostname() {
             try {
                 const response = await fetch(`${API_BASE}/system/hostname`, {
@@ -860,82 +1112,525 @@ Endpoint = vpn.example.com:51820"></textarea>
             }
         }
 
-        // ==================== System Settings (Hostname) ====================
+        // ==================== Network Configuration ====================
 
-        function showSystemAlert(type, message) {
-            const alert = document.getElementById('systemAlert');
+        function showNetAlert(type, message) {
+            const alert = document.getElementById('netAlert');
             alert.className = `alert alert-${type} visible`;
             alert.textContent = message;
-            if (type !== 'error') {
-                setTimeout(() => alert.classList.remove('visible'), 5000);
-            }
+            setTimeout(() => alert.classList.remove('visible'), 5000);
         }
 
-        async function loadSystemHostname() {
+        async function loadNetworkInterfaces() {
             try {
-                const response = await fetch(`${API_BASE}/system/hostname`, {
+                const response = await fetch(`${API_BASE}/system/netplan/interfaces`, {
                     credentials: 'include'
                 });
+                
                 if (response.ok) {
                     const data = await response.json();
-                    document.getElementById('hostnameInput').value = data.hostname || '';
+                    netplanInterfaces = data.interfaces || [];
+                    
+                    // Check for pending changes
+                    if (data.pending_changes && data.pending_expires_at) {
+                        showPendingBanner(data.pending_expires_at);
+                    } else {
+                        hidePendingBanner();
+                    }
+                    
+                    renderInterfaceSidebar();
+                } else {
+                    showNetAlert('error', 'Failed to load network interfaces');
                 }
             } catch (error) {
-                console.error('Error loading hostname:', error);
+                console.error('Error loading network interfaces:', error);
+                showNetAlert('error', 'Failed to load network interfaces');
             }
         }
 
-        async function saveHostname(reboot = false) {
-            const hostname = document.getElementById('hostnameInput').value.trim();
-            
-            if (!hostname) {
-                showSystemAlert('error', 'Hostname cannot be empty');
-                return;
-            }
-            
-            // Validate hostname format
-            if (!/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(hostname)) {
-                showSystemAlert('error', 'Invalid hostname. Use only letters, numbers, and hyphens. Cannot start or end with a hyphen.');
-                return;
-            }
-            
-            if (hostname.length > 63) {
-                showSystemAlert('error', 'Hostname must be 63 characters or less');
-                return;
-            }
-            
-            // Confirm if rebooting
-            if (reboot) {
-                if (!confirm(`Are you sure you want to change the hostname to "${hostname}" and reboot the system?`)) {
-                    return;
-                }
-            }
-            
+        async function loadDhcpStatus() {
             try {
-                const response = await fetch(`${API_BASE}/system/hostname`, {
+                const response = await fetch(`${API_BASE}/system/dhcp/status`, {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    dhcpStatus = await response.json();
+                }
+            } catch (error) {
+                console.error('Error loading DHCP status:', error);
+            }
+        }
+
+        function renderInterfaceSidebar() {
+            const container = document.getElementById('interfaceSidebar');
+            
+            if (netplanInterfaces.length === 0) {
+                container.innerHTML = '<div class="empty-state">No interfaces found</div>';
+                return;
+            }
+
+            container.innerHTML = netplanInterfaces.map(iface => {
+                const isActive = selectedInterface === iface.name;
+                const statusClass = iface.runtime?.status === 'up' ? 'up' : 'down';
+                const ip = iface.runtime?.ipv4?.[0]?.address || 
+                          (iface.config?.dhcp4 ? 'DHCP' : 'Not configured');
+                
+                return `
+                    <div class="interface-sidebar-item ${isActive ? 'active' : ''}" 
+                         onclick="selectInterface('${iface.name}')">
+                        <div class="iface-name">
+                            <span class="iface-status ${statusClass}"></span>
+                            ${iface.name}
+                        </div>
+                        <div class="iface-ip">${ip}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectInterface(name) {
+            selectedInterface = name;
+            renderInterfaceSidebar();
+            renderInterfaceConfig();
+        }
+
+        function renderInterfaceConfig() {
+            const panel = document.getElementById('interfaceConfigPanel');
+            const iface = netplanInterfaces.find(i => i.name === selectedInterface);
+            
+            if (!iface) {
+                panel.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+                        </svg>
+                        <div>Select an interface to configure</div>
+                    </div>
+                `;
+                return;
+            }
+
+            const currentIPs = iface.config?.addresses || [];
+            const isDhcp = iface.config?.dhcp4 || false;
+            const gateway = iface.config?.gateway4 || '';
+            const dns = iface.config?.dns_servers || [];
+            const runtimeIP = iface.runtime?.ipv4?.[0]?.address || 'None';
+            const mac = iface.runtime?.mac || 'Unknown';
+            const status = iface.runtime?.status || 'unknown';
+            
+            // Check if DHCP server is enabled on this interface
+            const dhcpInterfaces = dhcpStatus?.interfaces || [];
+            const isDhcpServer = dhcpInterfaces.includes(iface.name);
+            const dhcpSubnet = Object.entries(dhcpStatus?.subnets || {}).find(([subnet, config]) => {
+                // Match subnet to interface IP
+                const ifaceIP = iface.runtime?.ipv4?.[0]?.address;
+                if (!ifaceIP) return false;
+                const ifaceSubnet = ifaceIP.split('.').slice(0, 3).join('.');
+                return subnet.startsWith(ifaceSubnet);
+            });
+
+            panel.innerHTML = `
+                <h3>
+                    <span class="iface-badge">${iface.name}</span>
+                    Interface Configuration
+                </h3>
+
+                <!-- Current Status -->
+                <div class="config-section">
+                    <h4>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="16" x2="12" y2="12"/>
+                            <line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                        Current Status
+                    </h4>
+                    <div class="form-row">
+                        <div>
+                            <strong>Status:</strong> 
+                            <span class="status-badge ${status === 'up' ? 'connected' : 'disconnected'}">
+                                ${status === 'up' ? 'Up' : 'Down'}
+                            </span>
+                        </div>
+                        <div><strong>MAC:</strong> <code>${mac}</code></div>
+                    </div>
+                    <div style="margin-top: 12px;">
+                        <strong>Current IP:</strong> <code>${runtimeIP}</code>
+                    </div>
+                </div>
+
+                <!-- IP Configuration -->
+                <div class="config-section">
+                    <h4>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+                        </svg>
+                        IP Configuration
+                    </h4>
+                    
+                    <div class="form-group">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="dhcpClient" ${isDhcp ? 'checked' : ''} onchange="toggleDhcpClient()">
+                            <span class="toggle-slider"></span>
+                            <span>Use DHCP (obtain IP automatically)</span>
+                        </label>
+                    </div>
+
+                    <div id="staticIpConfig" style="${isDhcp ? 'display: none;' : ''}">
+                        <div class="form-group">
+                            <label>IP Addresses (CIDR notation)</label>
+                            <div class="ip-list" id="ipAddressList">
+                                ${currentIPs.length > 0 ? currentIPs.map((ip, idx) => `
+                                    <div class="ip-list-item">
+                                        <input type="text" value="${ip}" placeholder="192.168.1.100/24" 
+                                               class="ip-input" data-idx="${idx}">
+                                        <button class="btn btn-secondary btn-icon" onclick="removeIpAddress(${idx})">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                                <line x1="6" y1="6" x2="18" y2="18"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                `).join('') : `
+                                    <div class="ip-list-item">
+                                        <input type="text" value="" placeholder="192.168.1.100/24" class="ip-input" data-idx="0">
+                                        <button class="btn btn-secondary btn-icon" onclick="removeIpAddress(0)" disabled>
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                                <line x1="6" y1="6" x2="18" y2="18"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                `}
+                            </div>
+                            <button class="btn btn-secondary btn-sm" onclick="addIpAddress()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                Add IP Address
+                            </button>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="gateway">Gateway</label>
+                                <input type="text" id="gateway" value="${gateway}" placeholder="192.168.1.1">
+                            </div>
+                            <div class="form-group">
+                                <label for="dnsServers">DNS Servers</label>
+                                <input type="text" id="dnsServers" value="${dns.join(', ')}" placeholder="8.8.8.8, 8.8.4.4">
+                                <p class="form-hint">Comma-separated list</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 16px;">
+                        <button class="btn btn-primary" onclick="applyInterfaceConfig()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                                <polyline points="17 21 17 13 7 13 7 21"/>
+                                <polyline points="7 3 7 8 15 8"/>
+                            </svg>
+                            Apply IP Configuration
+                        </button>
+                        <p class="form-hint" style="margin-top: 8px;">
+                            Changes use netplan try - auto-reverts in 120 seconds if not confirmed
+                        </p>
+                    </div>
+                </div>
+
+                <!-- DHCP Server Configuration -->
+                <div class="config-section">
+                    <h4>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                            <line x1="8" y1="21" x2="16" y2="21"/>
+                            <line x1="12" y1="17" x2="12" y2="21"/>
+                        </svg>
+                        DHCP Server
+                    </h4>
+
+                    <div class="form-group">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="dhcpServerEnabled" ${isDhcpServer ? 'checked' : ''}>
+                            <span class="toggle-slider"></span>
+                            <span>Enable DHCP Server on this interface</span>
+                        </label>
+                        <p class="form-hint">Serve IP addresses to devices on this network</p>
+                    </div>
+
+                    <div id="dhcpServerConfig">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="dhcpRangeStart">Range Start</label>
+                                <input type="text" id="dhcpRangeStart" 
+                                       value="${dhcpSubnet?.[1]?.range_start || ''}" 
+                                       placeholder="192.168.1.100">
+                            </div>
+                            <div class="form-group">
+                                <label for="dhcpRangeEnd">Range End</label>
+                                <input type="text" id="dhcpRangeEnd" 
+                                       value="${dhcpSubnet?.[1]?.range_end || ''}" 
+                                       placeholder="192.168.1.200">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="dhcpLeaseTime">Lease Time (seconds)</label>
+                                <input type="number" id="dhcpLeaseTime" 
+                                       value="${dhcpSubnet?.[1]?.lease_time || 86400}" 
+                                       placeholder="86400">
+                            </div>
+                            <div class="form-group">
+                                <label for="dhcpDns">DNS Servers</label>
+                                <input type="text" id="dhcpDns" 
+                                       value="${(dhcpSubnet?.[1]?.dns_servers || ['8.8.8.8', '8.8.4.4']).join(', ')}" 
+                                       placeholder="8.8.8.8, 8.8.4.4">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 16px;">
+                        <button class="btn btn-primary" onclick="applyDhcpConfig()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                                <polyline points="17 21 17 13 7 13 7 21"/>
+                                <polyline points="7 3 7 8 15 8"/>
+                            </svg>
+                            Apply DHCP Configuration
+                        </button>
+                    </div>
+
+                    ${isDhcpServer && dhcpStatus?.active_leases?.length > 0 ? `
+                        <div style="margin-top: 24px;">
+                            <h4 style="margin-bottom: 12px;">Active Leases</h4>
+                            <table class="leases-table">
+                                <thead>
+                                    <tr>
+                                        <th>IP Address</th>
+                                        <th>MAC Address</th>
+                                        <th>Hostname</th>
+                                        <th>Expires</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${dhcpStatus.active_leases.map(lease => `
+                                        <tr>
+                                            <td>${lease.ip}</td>
+                                            <td>${lease.mac || '-'}</td>
+                                            <td>${lease.hostname || '-'}</td>
+                                            <td>${lease.ends || '-'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function toggleDhcpClient() {
+            const isDhcp = document.getElementById('dhcpClient').checked;
+            document.getElementById('staticIpConfig').style.display = isDhcp ? 'none' : 'block';
+        }
+
+        function addIpAddress() {
+            const list = document.getElementById('ipAddressList');
+            const items = list.querySelectorAll('.ip-list-item');
+            const newIdx = items.length;
+            
+            const newItem = document.createElement('div');
+            newItem.className = 'ip-list-item';
+            newItem.innerHTML = `
+                <input type="text" value="" placeholder="192.168.1.100/24" class="ip-input" data-idx="${newIdx}">
+                <button class="btn btn-secondary btn-icon" onclick="removeIpAddress(${newIdx})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            `;
+            list.appendChild(newItem);
+        }
+
+        function removeIpAddress(idx) {
+            const list = document.getElementById('ipAddressList');
+            const items = list.querySelectorAll('.ip-list-item');
+            if (items.length > 1) {
+                items[idx].remove();
+            }
+        }
+
+        async function applyInterfaceConfig() {
+            const isDhcp = document.getElementById('dhcpClient').checked;
+            
+            let addresses = [];
+            let gateway = null;
+            let dnsServers = [];
+
+            if (!isDhcp) {
+                const ipInputs = document.querySelectorAll('.ip-input');
+                ipInputs.forEach(input => {
+                    const val = input.value.trim();
+                    if (val) addresses.push(val);
+                });
+                
+                gateway = document.getElementById('gateway').value.trim() || null;
+                const dnsStr = document.getElementById('dnsServers').value.trim();
+                dnsServers = dnsStr ? dnsStr.split(',').map(s => s.trim()).filter(s => s) : [];
+            }
+
+            const config = {
+                addresses: addresses,
+                gateway: gateway,
+                dns_servers: dnsServers,
+                dhcp4: isDhcp
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/system/netplan/interface/${selectedInterface}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ hostname, reboot })
+                    body: JSON.stringify(config)
                 });
-                
-                const data = await response.json();
-                
+
                 if (response.ok) {
-                    if (data.rebooting) {
-                        showSystemAlert('warning', 'Hostname changed. System is rebooting... Please wait and refresh the page in a minute.');
+                    const result = await response.json();
+                    if (result.status === 'pending') {
+                        showNetAlert('warning', 'Configuration applied. Please confirm within 120 seconds or changes will revert.');
+                        showPendingBanner(result.expires_at);
                     } else {
-                        showSystemAlert('success', data.message);
-                        // Update the displayed hostname in the header
-                        document.getElementById('siteName').textContent = hostname;
-                        document.title = `Settings - RIST Manager // ${hostname}`;
+                        showNetAlert('success', 'Configuration applied successfully');
                     }
+                    await loadNetworkInterfaces();
                 } else {
-                    showSystemAlert('error', data.detail || 'Failed to change hostname');
+                    const error = await response.json();
+                    showNetAlert('error', error.detail || 'Failed to apply configuration');
                 }
             } catch (error) {
-                console.error('Error saving hostname:', error);
-                showSystemAlert('error', 'Failed to save hostname: ' + error.message);
+                console.error('Error applying interface config:', error);
+                showNetAlert('error', 'Failed to apply configuration');
+            }
+        }
+
+        async function applyDhcpConfig() {
+            const enabled = document.getElementById('dhcpServerEnabled').checked;
+            
+            const config = {
+                interface: selectedInterface,
+                enabled: enabled,
+                range_start: document.getElementById('dhcpRangeStart').value.trim() || null,
+                range_end: document.getElementById('dhcpRangeEnd').value.trim() || null,
+                lease_time: parseInt(document.getElementById('dhcpLeaseTime').value) || 86400,
+                dns_servers: document.getElementById('dhcpDns').value.split(',').map(s => s.trim()).filter(s => s),
+                static_leases: []
+            };
+
+            if (enabled && (!config.range_start || !config.range_end)) {
+                showNetAlert('error', 'Please specify DHCP range start and end addresses');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/system/dhcp/configure`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(config)
+                });
+
+                if (response.ok) {
+                    showNetAlert('success', 'DHCP configuration applied successfully');
+                    await loadDhcpStatus();
+                    renderInterfaceConfig();
+                } else {
+                    const error = await response.json();
+                    showNetAlert('error', error.detail || 'Failed to apply DHCP configuration');
+                }
+            } catch (error) {
+                console.error('Error applying DHCP config:', error);
+                showNetAlert('error', 'Failed to apply DHCP configuration');
+            }
+        }
+
+        function showPendingBanner(expiresAt) {
+            const banner = document.getElementById('pendingBanner');
+            banner.classList.add('visible');
+            pendingExpiry = new Date(expiresAt);
+            
+            if (countdownInterval) clearInterval(countdownInterval);
+            
+            updateCountdown();
+            countdownInterval = setInterval(updateCountdown, 1000);
+        }
+
+        function hidePendingBanner() {
+            const banner = document.getElementById('pendingBanner');
+            banner.classList.remove('visible');
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+        }
+
+        function updateCountdown() {
+            if (!pendingExpiry) return;
+            
+            const now = new Date();
+            const diff = Math.max(0, Math.floor((pendingExpiry - now) / 1000));
+            
+            document.getElementById('pendingCountdown').textContent = diff + 's';
+            
+            if (diff <= 0) {
+                hidePendingBanner();
+                showNetAlert('warning', 'Configuration changes have been reverted (timeout)');
+                loadNetworkInterfaces();
+            }
+        }
+
+        async function confirmNetplanChanges() {
+            try {
+                const response = await fetch(`${API_BASE}/system/netplan/confirm`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    hidePendingBanner();
+                    showNetAlert('success', 'Network configuration confirmed and saved');
+                    await loadNetworkInterfaces();
+                } else {
+                    const error = await response.json();
+                    showNetAlert('error', error.detail || 'Failed to confirm changes');
+                }
+            } catch (error) {
+                console.error('Error confirming changes:', error);
+                showNetAlert('error', 'Failed to confirm changes');
+            }
+        }
+
+        async function revertNetplanChanges() {
+            try {
+                const response = await fetch(`${API_BASE}/system/netplan/revert`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    hidePendingBanner();
+                    showNetAlert('success', 'Network configuration reverted');
+                    await loadNetworkInterfaces();
+                } else {
+                    const error = await response.json();
+                    showNetAlert('error', error.detail || 'Failed to revert changes');
+                }
+            } catch (error) {
+                console.error('Error reverting changes:', error);
+                showNetAlert('error', 'Failed to revert changes');
             }
         }
 
@@ -951,8 +1646,8 @@ Endpoint = vpn.example.com:51820"></textarea>
         function getInterfaceType(name) {
             if (name.startsWith('wg') || name.startsWith('wg0')) return 'WireGuard';
             if (name.startsWith('br')) return 'Bridge';
-            if (name.startsWith('veth') || name.startsWith('docker') || name.startsWith('vir')) return 'Virtual';
-            if (name === 'lo') return 'Loopback';
+            if (name.startsWith('veth')) return 'Virtual';
+            if (name.startsWith('docker') || name.startsWith('veth')) return 'Docker';
             if (name.startsWith('en') || name.startsWith('eth')) return 'Ethernet';
             return 'Other';
         }
@@ -961,71 +1656,49 @@ Endpoint = vpn.example.com:51820"></textarea>
             const availableList = document.getElementById('availableInterfaces');
             const bridgeList = document.getElementById('bridgeMembers');
             
-            // Filter out loopback, bridge itself, and already added interfaces
-            const bridgeName = document.getElementById('bridgeName').value || 'br0';
+            // Filter out loopback, WireGuard, and already-bridged interfaces
             const available = allInterfaces.filter(iface => 
                 iface.name !== 'lo' && 
-                iface.name !== bridgeName &&
+                !iface.name.startsWith('wg') && 
+                !iface.name.startsWith('br') &&
                 !bridgeMembers.includes(iface.name)
             );
             
-            if (available.length === 0) {
-                availableList.innerHTML = `
-                    <div class="empty-state">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="2" y="2" width="20" height="8" rx="2"/>
-                            <rect x="2" y="14" width="20" height="8" rx="2"/>
-                            <line x1="6" y1="6" x2="6.01" y2="6"/>
-                            <line x1="6" y1="18" x2="6.01" y2="18"/>
-                        </svg>
-                        <p>No available interfaces</p>
-                    </div>
-                `;
-            } else {
-                availableList.innerHTML = available.map(iface => {
-                    const ipv4 = iface.ipv4 && iface.ipv4.length > 0 ? iface.ipv4[0].address : 'No IP';
-                    return `
-                    <div class="interface-item ${selectedAvailable === iface.name ? 'selected' : ''}" 
+            // Render available interfaces
+            availableList.innerHTML = available.length > 0 ? available.map(iface => {
+                const isSelected = selectedAvailable === iface.name;
+                const type = getInterfaceType(iface.name);
+                const ip = iface.ipv4?.[0]?.address || 'No IP';
+                
+                return `
+                    <div class="interface-item ${isSelected ? 'selected' : ''}" 
                          onclick="selectAvailable('${iface.name}')">
                         <div>
                             <div class="name">${iface.name}</div>
-                            <div class="info">${ipv4}</div>
+                            <div class="info">${ip}</div>
                         </div>
-                        <span class="type-badge">${getInterfaceType(iface.name)}</span>
-                    </div>
-                `}).join('');
-            }
-            
-            if (bridgeMembers.length === 0) {
-                bridgeList.innerHTML = `
-                    <div class="empty-state">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <path d="M12 8v8M8 12h8"/>
-                        </svg>
-                        <p>Add interfaces to enable multicast</p>
+                        <span class="type-badge">${type}</span>
                     </div>
                 `;
-            } else {
-                bridgeList.innerHTML = bridgeMembers.map(name => {
-                    const iface = allInterfaces.find(i => i.name === name) || { name, ipv4: [] };
-                    const ipv4 = iface.ipv4 && iface.ipv4.length > 0 ? iface.ipv4[0].address : 'Bridge member';
-                    return `
-                        <div class="interface-item ${selectedBridge === name ? 'selected' : ''}" 
-                             onclick="selectBridge('${name}')">
-                            <div>
-                                <div class="name">${name}</div>
-                                <div class="info">${ipv4}</div>
-                            </div>
-                            <span class="type-badge">${getInterfaceType(name)}</span>
-                        </div>
-                    `;
-                }).join('');
-            }
+            }).join('') : '<div style="padding: 20px; text-align: center; color: var(--text-muted);">No available interfaces</div>';
             
-            // Update button states
-            document.getElementById('addToMcast').disabled = !selectedAvailable;
-            document.getElementById('removeFromMcast').disabled = !selectedBridge;
+            // Render bridge members
+            bridgeList.innerHTML = bridgeMembers.length > 0 ? bridgeMembers.map(name => {
+                const isSelected = selectedBridge === name;
+                const iface = allInterfaces.find(i => i.name === name);
+                const type = iface ? getInterfaceType(name) : 'Unknown';
+                
+                return `
+                    <div class="interface-item ${isSelected ? 'selected' : ''}" 
+                         onclick="selectBridge('${name}')">
+                        <div>
+                            <div class="name">${name}</div>
+                            <div class="info">Bridge member</div>
+                        </div>
+                        <span class="type-badge">${type}</span>
+                    </div>
+                `;
+            }).join('') : '<div style="padding: 20px; text-align: center; color: var(--text-muted);">No bridge members</div>';
         }
 
         function selectAvailable(name) {
@@ -1064,7 +1737,6 @@ Endpoint = vpn.example.com:51820"></textarea>
                 });
                 if (ifaceResponse.ok) {
                     const ifaceData = await ifaceResponse.json();
-                    // The endpoint returns { interfaces: [...] }
                     allInterfaces = ifaceData.interfaces || [];
                 }
                 
@@ -1246,7 +1918,8 @@ Endpoint = vpn.example.com:51820"></textarea>
             if (!isAuthenticated) return;
             
             loadHostname();
-            loadSystemHostname();
+            loadNetworkInterfaces();
+            loadDhcpStatus();
             loadMulticastConfig();
             loadWireGuard();
         });
