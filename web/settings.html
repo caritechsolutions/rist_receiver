@@ -345,24 +345,31 @@
 
         /* Toggle Switch */
         .toggle-switch {
-            display: flex;
+            display: inline-flex;
             align-items: center;
             gap: 12px;
             cursor: pointer;
+            user-select: none;
         }
 
         .toggle-switch input {
-            display: none;
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
         }
 
         .toggle-slider {
+            display: inline-block;
             width: 44px;
+            min-width: 44px;
             height: 24px;
             background: var(--bg-tertiary);
             border: 1px solid var(--border-color);
             border-radius: 12px;
             position: relative;
             transition: all 0.2s ease;
+            flex-shrink: 0;
         }
 
         .toggle-slider::after {
@@ -385,6 +392,10 @@
         .toggle-switch input:checked + .toggle-slider::after {
             left: 22px;
             background: white;
+        }
+
+        .toggle-switch span:last-child {
+            color: var(--text-primary);
         }
 
         /* Interface Selector */
