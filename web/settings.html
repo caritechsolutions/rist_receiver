@@ -784,6 +784,41 @@
             opacity: 0.5;
         }
 
+        /* Disabled section */
+        .config-section.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .config-section.disabled .toggle-slider {
+            background: var(--bg-tertiary) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        .config-section.disabled input {
+            background: var(--bg-tertiary);
+            cursor: not-allowed;
+        }
+
+        .disabled-notice {
+            background: var(--accent-yellow-dim);
+            border: 1px solid var(--accent-yellow);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 13px;
+            color: var(--accent-yellow);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .disabled-notice svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
         @media (max-width: 900px) {
             .network-config-grid {
                 grid-template-columns: 1fr;
@@ -1353,7 +1388,7 @@ Endpoint = vpn.example.com:51820"></textarea>
                 </div>
 
                 <!-- DHCP Server Configuration -->
-                <div class="config-section">
+                <div class="config-section ${isDhcp ? 'disabled' : ''}" id="dhcpServerSection">
                     <h4>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
@@ -1363,9 +1398,20 @@ Endpoint = vpn.example.com:51820"></textarea>
                         DHCP Server
                     </h4>
 
+                    ${isDhcp ? `
+                        <div class="disabled-notice">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="8" x2="12" y2="12"/>
+                                <line x1="12" y1="16" x2="12.01" y2="16"/>
+                            </svg>
+                            DHCP Server unavailable - this interface is using DHCP client
+                        </div>
+                    ` : ''}
+
                     <div class="form-group">
                         <label class="toggle-switch">
-                            <input type="checkbox" id="dhcpServerEnabled" ${isDhcpServer ? 'checked' : ''}>
+                            <input type="checkbox" id="dhcpServerEnabled" ${isDhcpServer ? 'checked' : ''} ${isDhcp ? 'disabled' : ''}>
                             <span class="toggle-slider"></span>
                             <span>Enable DHCP Server on this interface</span>
                         </label>
@@ -1446,6 +1492,17 @@ Endpoint = vpn.example.com:51820"></textarea>
         function toggleDhcpClient() {
             const isDhcp = document.getElementById('dhcpClient').checked;
             document.getElementById('staticIpConfig').style.display = isDhcp ? 'none' : 'block';
+            
+            // Disable/enable DHCP server section
+            const dhcpServerSection = document.getElementById('dhcpServerSection');
+            if (isDhcp) {
+                dhcpServerSection.classList.add('disabled');
+                document.getElementById('dhcpServerEnabled').disabled = true;
+                document.getElementById('dhcpServerEnabled').checked = false;
+            } else {
+                dhcpServerSection.classList.remove('disabled');
+                document.getElementById('dhcpServerEnabled').disabled = false;
+            }
         }
 
         function addIpAddress() {
