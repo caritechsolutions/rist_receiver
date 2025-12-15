@@ -34,9 +34,18 @@ install_dependencies() {
     # Install git if not present
     apt-get install -y git
     
-    # Install system packages
+    # Install system packages (including isc-dhcp-server and resolvconf)
     apt-get install -y python3 python3-pip python3-dev python3-psutil python3-yaml build-essential \
-    cmake pkg-config meson ninja-build graphviz nginx redis-server libmicrohttpd-dev ffmpeg
+    cmake pkg-config meson ninja-build graphviz nginx redis-server libmicrohttpd-dev ffmpeg \
+    isc-dhcp-server resolvconf
+    
+    # Stop and disable DHCP server until configured via web UI
+    systemctl stop isc-dhcp-server 2>/dev/null || true
+    systemctl disable isc-dhcp-server 2>/dev/null || true
+    
+    # Ensure resolvconf is enabled (needed for WireGuard DNS)
+    systemctl enable resolvconf 2>/dev/null || true
+    systemctl start resolvconf 2>/dev/null || true
 }
 
 # Build and install librist
@@ -290,7 +299,7 @@ EOF
     echo "Logrotate configuration completed."
 }
 
-# New function to install and configure WireGuard
+# Install and configure WireGuard
 install_wireguard() {
     echo "Installing WireGuard..."
     apt-get install -y wireguard
@@ -325,6 +334,37 @@ EOF
     echo ""
     
     # Not starting WireGuard service automatically since config needs editing
+}
+
+# Set up DHCP server (disabled by default, configured via web UI)
+setup_dhcp_server() {
+    echo "Configuring DHCP server..."
+    
+    # Create initial DHCP config
+    cat > /etc/dhcp/dhcpd.conf << 'EOF'
+# DHCP Server Configuration
+# Configure via RIST Manager web interface at Settings -> Network
+
+authoritative;
+log-facility local7;
+
+# Subnets will be added by RIST Manager when you enable DHCP on an interface
+EOF
+    
+    # Create interfaces file (empty initially - no interfaces listening)
+    echo 'INTERFACESv4=""' > /etc/default/isc-dhcp-server
+    
+    # Ensure DHCP server is stopped and disabled until configured
+    systemctl stop isc-dhcp-server 2>/dev/null || true
+    systemctl disable isc-dhcp-server 2>/dev/null || true
+    
+    echo ""
+    echo "=========================================================="
+    echo "DHCP Server has been installed but is disabled."
+    echo "Configure it through the web interface at:"
+    echo "   Settings -> Network Configuration"
+    echo "=========================================================="
+    echo ""
 }
 
 # Start services
@@ -362,6 +402,7 @@ main() {
     setup_service
     setup_logrotate
     install_wireguard
+    setup_dhcp_server
     start_services
     
     echo ""
@@ -378,6 +419,10 @@ main() {
     echo "Please change your password after first login!"
     echo ""
     echo "Check service status with: systemctl status rist-api"
+    echo ""
+    echo "New features installed:"
+    echo "   - DHCP Server (configure in Settings -> Network)"
+    echo "   - WireGuard DNS support (resolvconf)"
     echo ""
 }
 
