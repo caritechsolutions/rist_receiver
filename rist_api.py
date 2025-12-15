@@ -850,6 +850,93 @@ def get_system_hostname():
     """Get the system hostname"""
     return {"hostname": socket.gethostname()}
 
+# =============================================================================
+# Hostname Management Endpoint - Add this to rist_api.py after the GET /system/hostname endpoint
+# =============================================================================
+
+class HostnameChangeRequest(BaseModel):
+    hostname: str
+    reboot: bool = False
+
+
+@app.post("/system/hostname")
+def set_system_hostname(request: HostnameChangeRequest, auth: dict = Depends(require_auth)):
+    """
+    Change the system hostname.
+    Updates /etc/hostname and /etc/hosts.
+    Optionally triggers a reboot.
+    """
+    import re
+    
+    new_hostname = request.hostname.strip()
+    
+    # Validate hostname
+    # - Must be 1-63 characters
+    # - Only alphanumeric and hyphens
+    # - Cannot start or end with hyphen
+    # - Cannot be all numeric
+    if not new_hostname:
+        raise HTTPException(status_code=400, detail="Hostname cannot be empty")
+    
+    if len(new_hostname) > 63:
+        raise HTTPException(status_code=400, detail="Hostname must be 63 characters or less")
+    
+    if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$', new_hostname):
+        raise HTTPException(status_code=400, detail="Hostname can only contain letters, numbers, and hyphens. Cannot start or end with a hyphen.")
+    
+    if new_hostname.isdigit():
+        raise HTTPException(status_code=400, detail="Hostname cannot be all numbers")
+    
+    try:
+        old_hostname = socket.gethostname()
+        
+        # Update /etc/hostname
+        with open('/etc/hostname', 'w') as f:
+            f.write(new_hostname + '\n')
+        
+        # Update /etc/hosts - replace old hostname with new
+        with open('/etc/hosts', 'r') as f:
+            hosts_content = f.read()
+        
+        # Replace old hostname with new hostname
+        # This handles both "127.0.1.1 hostname" and "127.0.0.1 localhost hostname" patterns
+        updated_hosts = hosts_content.replace(old_hostname, new_hostname)
+        
+        with open('/etc/hosts', 'w') as f:
+            f.write(updated_hosts)
+        
+        # Apply hostname immediately without reboot (won't affect running services until restart)
+        subprocess.run(['hostnamectl', 'set-hostname', new_hostname], check=True, capture_output=True)
+        
+        logger.info(f"Hostname changed from '{old_hostname}' to '{new_hostname}'")
+        
+        # Trigger reboot if requested
+        if request.reboot:
+            # Schedule reboot in 3 seconds to allow response to be sent
+            subprocess.Popen(['shutdown', '-r', '+0', 'Hostname changed - rebooting'])
+            return {
+                "success": True,
+                "message": f"Hostname changed to '{new_hostname}'. System is rebooting...",
+                "old_hostname": old_hostname,
+                "new_hostname": new_hostname,
+                "rebooting": True
+            }
+        
+        return {
+            "success": True,
+            "message": f"Hostname changed to '{new_hostname}'. A reboot is recommended for all services to recognize the new hostname.",
+            "old_hostname": old_hostname,
+            "new_hostname": new_hostname,
+            "rebooting": False
+        }
+        
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to change hostname: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to apply hostname: {e.stderr.decode() if e.stderr else str(e)}")
+    except Exception as e:
+        logger.error(f"Failed to change hostname: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to change hostname: {str(e)}")
+
 
 @app.get("/system/network-interfaces")
 def get_network_interfaces():
