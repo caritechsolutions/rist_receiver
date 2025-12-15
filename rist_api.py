@@ -20,6 +20,9 @@ import socket
 import netifaces
 import hashlib
 import secrets
+import glob
+import shutil
+import threading
 
 
 # Global variable to store previous network stats for bandwidth calculation
@@ -476,8 +479,6 @@ def get_system_health_metrics(cache_timeout: int = 1):
         logger.error(traceback.format_exc())
         return {}
 
-import threading
-
 # Lock to prevent concurrent metrics fetches to the same port
 metrics_fetch_lock = threading.Lock()
 
@@ -850,9 +851,6 @@ def get_system_hostname():
     """Get the system hostname"""
     return {"hostname": socket.gethostname()}
 
-# =============================================================================
-# Hostname Management Endpoint - Add this to rist_api.py after the GET /system/hostname endpoint
-# =============================================================================
 
 class HostnameChangeRequest(BaseModel):
     hostname: str
@@ -871,10 +869,6 @@ def set_system_hostname(request: HostnameChangeRequest, auth: dict = Depends(req
     new_hostname = request.hostname.strip()
     
     # Validate hostname
-    # - Must be 1-63 characters
-    # - Only alphanumeric and hyphens
-    # - Cannot start or end with hyphen
-    # - Cannot be all numeric
     if not new_hostname:
         raise HTTPException(status_code=400, detail="Hostname cannot be empty")
     
@@ -898,21 +892,18 @@ def set_system_hostname(request: HostnameChangeRequest, auth: dict = Depends(req
         with open('/etc/hosts', 'r') as f:
             hosts_content = f.read()
         
-        # Replace old hostname with new hostname
-        # This handles both "127.0.1.1 hostname" and "127.0.0.1 localhost hostname" patterns
         updated_hosts = hosts_content.replace(old_hostname, new_hostname)
         
         with open('/etc/hosts', 'w') as f:
             f.write(updated_hosts)
         
-        # Apply hostname immediately without reboot (won't affect running services until restart)
+        # Apply hostname immediately without reboot
         subprocess.run(['hostnamectl', 'set-hostname', new_hostname], check=True, capture_output=True)
         
         logger.info(f"Hostname changed from '{old_hostname}' to '{new_hostname}'")
         
         # Trigger reboot if requested
         if request.reboot:
-            # Schedule reboot in 3 seconds to allow response to be sent
             subprocess.Popen(['shutdown', '-r', '+0', 'Hostname changed - rebooting'])
             return {
                 "success": True,
@@ -990,11 +981,9 @@ def get_network_interfaces():
             try:
                 with open(f"/sys/class/net/{iface}/operstate", "r") as f:
                     state = f.read().strip()
-                    # "up" = up, "unknown" = often used by WireGuard/tun interfaces when active
                     if state == "up":
                         iface_info["status"] = "up"
                     elif state == "unknown":
-                        # For WireGuard/tunnel interfaces, check if they have an IP
                         if iface_info["ipv4"] or iface_info["ipv6"]:
                             iface_info["status"] = "up"
                         else:
@@ -1002,7 +991,6 @@ def get_network_interfaces():
                     else:
                         iface_info["status"] = "down"
             except:
-                # If we have an IP, assume it's up
                 if iface_info["ipv4"] or iface_info["ipv6"]:
                     iface_info["status"] = "up"
             
@@ -1011,7 +999,7 @@ def get_network_interfaces():
                 with open(f"/sys/class/net/{iface}/speed", "r") as f:
                     speed = int(f.read().strip())
                     if speed > 0:
-                        iface_info["speed"] = speed  # in Mbps
+                        iface_info["speed"] = speed
             except:
                 pass
             
@@ -1116,25 +1104,19 @@ def save_wireguard_config(config: dict = Body(...)):
     if not config_content.strip():
         raise HTTPException(status_code=400, detail="Configuration cannot be empty")
     
-    # Basic validation - check for required sections
     if "[Interface]" not in config_content:
         raise HTTPException(status_code=400, detail="Invalid config: missing [Interface] section")
     
     try:
-        # Ensure directory exists
         os.makedirs("/etc/wireguard", exist_ok=True)
         
-        # Stop WireGuard if running
         subprocess.run(["systemctl", "stop", "wg-quick@wg0"], capture_output=True)
         
-        # Write config file
         with open(config_path, "w") as f:
             f.write(config_content)
         
-        # Set proper permissions (important for WireGuard)
         os.chmod(config_path, 0o600)
         
-        # Enable and start WireGuard
         subprocess.run(["systemctl", "enable", "wg-quick@wg0"], check=True)
         subprocess.run(["systemctl", "start", "wg-quick@wg0"], check=True)
         
@@ -1186,17 +1168,14 @@ def get_multicast_config():
             if netplan_config and "network" in netplan_config:
                 bridges = netplan_config["network"].get("bridges", {})
                 
-                # Find the first bridge (should be our multicast bridge)
                 for bridge_name, bridge_config in bridges.items():
                     config["bridge_name"] = bridge_name
                     config["bridge_members"] = bridge_config.get("interfaces", [])
                     
-                    # Get bridge address
                     addresses = bridge_config.get("addresses", [])
                     if addresses:
                         config["bridge_address"] = addresses[0]
                     
-                    # Get multicast route
                     routes = bridge_config.get("routes", [])
                     for route in routes:
                         if route.get("to", "").startswith("224."):
@@ -1217,8 +1196,6 @@ def save_multicast_config(config: MulticastConfig):
         logger.info(f"Saving multicast config: bridge={config.bridge_name}, members={config.bridge_members}")
         
         if config.bridge_members:
-            # Build netplan configuration - ONLY define the bridge
-            # Do NOT redefine ethernet interfaces - let them keep their existing config
             netplan_config = {
                 "network": {
                     "version": 2,
@@ -1241,23 +1218,18 @@ def save_multicast_config(config: MulticastConfig):
                 }
             }
             
-            # Write netplan file
             os.makedirs(os.path.dirname(NETPLAN_MCAST_FILE), exist_ok=True)
             
             with open(NETPLAN_MCAST_FILE, 'w') as f:
                 yaml.dump(netplan_config, f, default_flow_style=False, sort_keys=False)
             
-            # Set proper permissions
             os.chmod(NETPLAN_MCAST_FILE, 0o600)
         else:
-            # No bridge members - remove the config file if it exists
             if os.path.exists(NETPLAN_MCAST_FILE):
                 os.remove(NETPLAN_MCAST_FILE)
                 logger.info("Removed multicast config file (no bridge members)")
         
-        # Apply netplan configuration
         try:
-            # First try to apply
             result = subprocess.run(
                 ["netplan", "apply"],
                 capture_output=True,
@@ -1274,7 +1246,6 @@ def save_multicast_config(config: MulticastConfig):
             
             logger.info("Multicast configuration applied successfully")
             
-            # Restart all running channels so they pick up the new routing
             restarted_channels = []
             config_data = load_config()
             for channel_id in config_data["channels"]:
@@ -1318,7 +1289,6 @@ def delete_multicast_config():
         if os.path.exists(NETPLAN_MCAST_FILE):
             os.remove(NETPLAN_MCAST_FILE)
             
-            # Apply netplan to remove the bridge
             subprocess.run(["netplan", "apply"], check=True, timeout=30)
             
             logger.info("Multicast configuration removed")
@@ -1331,6 +1301,775 @@ def delete_multicast_config():
         logger.error(f"Failed to remove multicast config: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to remove configuration: {str(e)}")
 
+
+# =============================================================================
+# Netplan Interface Management
+# =============================================================================
+
+NETPLAN_DIR = "/etc/netplan"
+RIST_MANAGED_NETPLAN = "/etc/netplan/80-rist-managed.yaml"
+DHCP_CONFIG_FILE = "/etc/dhcp/dhcpd.conf"
+DHCP_DEFAULT_FILE = "/etc/default/isc-dhcp-server"
+
+# Track pending netplan changes (in-memory state)
+netplan_pending = {
+    "active": False,
+    "timeout_thread": None,
+    "backup_files": {},
+    "expires_at": None
+}
+
+
+class InterfaceUpdateRequest(BaseModel):
+    addresses: List[str] = []
+    gateway: Optional[str] = None
+    dns_servers: List[str] = ["8.8.8.8", "8.8.4.4"]
+    dhcp4: bool = False
+
+
+class DHCPSubnetRequest(BaseModel):
+    interface: str
+    enabled: bool
+    range_start: Optional[str] = None
+    range_end: Optional[str] = None
+    lease_time: int = 86400
+    dns_servers: List[str] = ["8.8.8.8", "8.8.4.4"]
+    static_leases: List[Dict] = []
+
+
+def scan_netplan_files() -> Dict:
+    """
+    Scan all netplan files and build a map of interfaces to their source files.
+    """
+    result = {
+        "files": {},
+        "interfaces": {}
+    }
+    
+    netplan_files = sorted(glob.glob(f"{NETPLAN_DIR}/*.yaml"))
+    
+    for filepath in netplan_files:
+        try:
+            with open(filepath, 'r') as f:
+                content = yaml.safe_load(f)
+            
+            if not content or "network" not in content:
+                continue
+                
+            result["files"][filepath] = content
+            
+            network = content["network"]
+            
+            for iface_name, iface_config in network.get("ethernets", {}).items():
+                result["interfaces"][iface_name] = {
+                    "file": filepath,
+                    "type": "ethernets",
+                    "config": iface_config or {}
+                }
+            
+            for iface_name, iface_config in network.get("bridges", {}).items():
+                result["interfaces"][iface_name] = {
+                    "file": filepath,
+                    "type": "bridges",
+                    "config": iface_config or {}
+                }
+            
+            for iface_name, iface_config in network.get("bonds", {}).items():
+                result["interfaces"][iface_name] = {
+                    "file": filepath,
+                    "type": "bonds",
+                    "config": iface_config or {}
+                }
+            
+            for iface_name, iface_config in network.get("vlans", {}).items():
+                result["interfaces"][iface_name] = {
+                    "file": filepath,
+                    "type": "vlans",
+                    "config": iface_config or {}
+                }
+                
+        except Exception as e:
+            logger.error(f"Error parsing netplan file {filepath}: {e}")
+    
+    return result
+
+
+def get_interface_runtime_info(iface_name: str) -> Dict:
+    """Get runtime info for an interface using netifaces"""
+    info = {
+        "name": iface_name,
+        "exists": False,
+        "ipv4": [],
+        "mac": None,
+        "status": "unknown"
+    }
+    
+    try:
+        if iface_name in netifaces.interfaces():
+            info["exists"] = True
+            addrs = netifaces.ifaddresses(iface_name)
+            
+            if netifaces.AF_INET in addrs:
+                for addr in addrs[netifaces.AF_INET]:
+                    info["ipv4"].append({
+                        "address": addr.get("addr"),
+                        "netmask": addr.get("netmask")
+                    })
+            
+            if netifaces.AF_LINK in addrs:
+                for addr in addrs[netifaces.AF_LINK]:
+                    if addr.get("addr"):
+                        info["mac"] = addr.get("addr")
+                        break
+            
+            try:
+                with open(f"/sys/class/net/{iface_name}/operstate", "r") as f:
+                    state = f.read().strip()
+                    info["status"] = state
+            except:
+                pass
+                
+    except Exception as e:
+        logger.error(f"Error getting runtime info for {iface_name}: {e}")
+    
+    return info
+
+
+def backup_netplan_file(filepath: str) -> str:
+    """Create a backup of a netplan file, return backup content"""
+    if os.path.exists(filepath):
+        with open(filepath, 'r') as f:
+            return f.read()
+    return ""
+
+
+def restore_netplan_backup(filepath: str, content: str):
+    """Restore a netplan file from backup content"""
+    if content:
+        with open(filepath, 'w') as f:
+            f.write(content)
+    elif os.path.exists(filepath):
+        os.remove(filepath)
+
+
+def netplan_timeout_revert():
+    """Called when netplan try times out - restore backups"""
+    global netplan_pending
+    
+    if not netplan_pending["active"]:
+        return
+    
+    logger.warning("Netplan try timeout - reverting changes")
+    
+    for filepath, content in netplan_pending["backup_files"].items():
+        try:
+            restore_netplan_backup(filepath, content)
+        except Exception as e:
+            logger.error(f"Error restoring {filepath}: {e}")
+    
+    try:
+        subprocess.run(["netplan", "apply"], check=True, capture_output=True)
+    except Exception as e:
+        logger.error(f"Error applying reverted netplan: {e}")
+    
+    netplan_pending["active"] = False
+    netplan_pending["backup_files"] = {}
+    netplan_pending["expires_at"] = None
+
+
+@app.get("/system/netplan/interfaces")
+def get_netplan_interfaces(auth: dict = Depends(require_auth)):
+    """
+    Get all network interfaces with their netplan configuration and runtime status.
+    """
+    try:
+        netplan_data = scan_netplan_files()
+        
+        system_interfaces = netifaces.interfaces()
+        
+        result = {
+            "interfaces": [],
+            "pending_changes": netplan_pending["active"],
+            "pending_expires_at": netplan_pending["expires_at"].isoformat() if netplan_pending["expires_at"] else None
+        }
+        
+        processed = set()
+        
+        for iface_name, iface_data in netplan_data["interfaces"].items():
+            if iface_name == "lo" or iface_name.startswith("wg"):
+                continue
+                
+            processed.add(iface_name)
+            runtime = get_interface_runtime_info(iface_name)
+            
+            config = iface_data["config"]
+            
+            # Extract gateway from routes if present
+            gateway = config.get("gateway4")
+            if not gateway and config.get("routes"):
+                for route in config.get("routes", []):
+                    if route.get("to") == "default" or route.get("to") == "0.0.0.0/0":
+                        gateway = route.get("via")
+                        break
+            
+            result["interfaces"].append({
+                "name": iface_name,
+                "source_file": iface_data["file"],
+                "type": iface_data["type"],
+                "configured": True,
+                "runtime": runtime,
+                "config": {
+                    "addresses": config.get("addresses", []),
+                    "gateway4": gateway,
+                    "dns_servers": config.get("nameservers", {}).get("addresses", []),
+                    "dhcp4": config.get("dhcp4", False)
+                }
+            })
+        
+        for iface_name in system_interfaces:
+            if iface_name == "lo" or iface_name.startswith("wg"):
+                continue
+            if iface_name in processed:
+                continue
+            
+            runtime = get_interface_runtime_info(iface_name)
+            
+            result["interfaces"].append({
+                "name": iface_name,
+                "source_file": None,
+                "type": "ethernets",
+                "configured": False,
+                "runtime": runtime,
+                "config": {
+                    "addresses": [],
+                    "gateway4": None,
+                    "dns_servers": [],
+                    "dhcp4": False
+                }
+            })
+        
+        result["interfaces"].sort(key=lambda x: x["name"])
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error getting netplan interfaces: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/system/netplan/interface/{iface_name}")
+def update_interface_config(iface_name: str, config: InterfaceUpdateRequest, auth: dict = Depends(require_auth)):
+    """
+    Update interface configuration using netplan try.
+    Changes are temporary until confirmed (120 second timeout).
+    """
+    global netplan_pending
+    
+    if iface_name == "lo" or iface_name.startswith("wg"):
+        raise HTTPException(status_code=400, detail="Cannot configure loopback or WireGuard interfaces here")
+    
+    if netplan_pending["active"]:
+        raise HTTPException(status_code=409, detail="Another netplan change is pending confirmation. Confirm or wait for timeout.")
+    
+    try:
+        netplan_data = scan_netplan_files()
+        
+        if iface_name in netplan_data["interfaces"]:
+            target_file = netplan_data["interfaces"][iface_name]["file"]
+            iface_type = netplan_data["interfaces"][iface_name]["type"]
+        else:
+            target_file = RIST_MANAGED_NETPLAN
+            iface_type = "ethernets"
+        
+        backup_content = backup_netplan_file(target_file)
+        
+        if os.path.exists(target_file):
+            with open(target_file, 'r') as f:
+                netplan_config = yaml.safe_load(f) or {}
+        else:
+            netplan_config = {}
+        
+        if "network" not in netplan_config:
+            netplan_config["network"] = {"version": 2}
+        if iface_type not in netplan_config["network"]:
+            netplan_config["network"][iface_type] = {}
+        
+        new_iface_config = {}
+        
+        if config.dhcp4:
+            new_iface_config["dhcp4"] = True
+        else:
+            new_iface_config["dhcp4"] = False
+            if config.addresses:
+                new_iface_config["addresses"] = config.addresses
+            if config.gateway:
+                new_iface_config["routes"] = [{"to": "default", "via": config.gateway}]
+            if config.dns_servers:
+                new_iface_config["nameservers"] = {"addresses": config.dns_servers}
+        
+        netplan_config["network"][iface_type][iface_name] = new_iface_config
+        
+        with open(target_file, 'w') as f:
+            yaml.dump(netplan_config, f, default_flow_style=False)
+        
+        with open(f"{target_file}.bak", 'w') as f:
+            f.write(backup_content)
+        
+        try:
+            result = subprocess.run(
+                ["netplan", "try", "--timeout", "120"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+        except subprocess.TimeoutExpired:
+            pass
+        except subprocess.CalledProcessError as e:
+            restore_netplan_backup(target_file, backup_content)
+            raise HTTPException(status_code=500, detail=f"Netplan try failed: {e.stderr}")
+        
+        netplan_pending["active"] = True
+        netplan_pending["backup_files"] = {target_file: backup_content}
+        netplan_pending["expires_at"] = datetime.now() + timedelta(seconds=120)
+        
+        def timeout_handler():
+            time.sleep(125)
+            if netplan_pending["active"]:
+                netplan_timeout_revert()
+        
+        timeout_thread = threading.Thread(target=timeout_handler, daemon=True)
+        timeout_thread.start()
+        netplan_pending["timeout_thread"] = timeout_thread
+        
+        return {
+            "status": "pending",
+            "message": "Network configuration applied temporarily. Confirm within 120 seconds or changes will revert.",
+            "expires_at": netplan_pending["expires_at"].isoformat(),
+            "interface": iface_name,
+            "file_modified": target_file
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating interface {iface_name}: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/system/netplan/confirm")
+def confirm_netplan_changes(auth: dict = Depends(require_auth)):
+    """Confirm pending netplan changes to make them permanent"""
+    global netplan_pending
+    
+    if not netplan_pending["active"]:
+        raise HTTPException(status_code=400, detail="No pending changes to confirm")
+    
+    try:
+        result = subprocess.run(["netplan", "apply"], capture_output=True, text=True, check=True)
+        
+        netplan_pending["active"] = False
+        netplan_pending["backup_files"] = {}
+        netplan_pending["expires_at"] = None
+        
+        return {
+            "status": "confirmed",
+            "message": "Network configuration changes have been made permanent"
+        }
+        
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error confirming netplan: {e.stderr}")
+        raise HTTPException(status_code=500, detail=f"Failed to confirm changes: {e.stderr}")
+
+
+@app.post("/system/netplan/revert")
+def revert_netplan_changes(auth: dict = Depends(require_auth)):
+    """Manually revert pending netplan changes before timeout"""
+    global netplan_pending
+    
+    if not netplan_pending["active"]:
+        raise HTTPException(status_code=400, detail="No pending changes to revert")
+    
+    try:
+        for filepath, content in netplan_pending["backup_files"].items():
+            restore_netplan_backup(filepath, content)
+        
+        subprocess.run(["netplan", "apply"], check=True, capture_output=True)
+        
+        netplan_pending["active"] = False
+        netplan_pending["backup_files"] = {}
+        netplan_pending["expires_at"] = None
+        
+        return {
+            "status": "reverted",
+            "message": "Network configuration changes have been reverted"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error reverting netplan: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# DHCP Server Management (isc-dhcp-server)
+# =============================================================================
+
+def parse_dhcp_config() -> Dict:
+    """Parse the current DHCP server configuration"""
+    config = {
+        "subnets": {},
+        "global_options": {},
+        "static_leases": []
+    }
+    
+    if not os.path.exists(DHCP_CONFIG_FILE):
+        return config
+    
+    try:
+        with open(DHCP_CONFIG_FILE, 'r') as f:
+            content = f.read()
+        
+        config["raw_content"] = content
+        
+        import re
+        subnet_pattern = r'subnet\s+([\d.]+)\s+netmask\s+([\d.]+)\s*\{([^}]+)\}'
+        for match in re.finditer(subnet_pattern, content, re.DOTALL):
+            subnet_ip = match.group(1)
+            netmask = match.group(2)
+            block_content = match.group(3)
+            
+            subnet_config = {
+                "netmask": netmask,
+                "range_start": None,
+                "range_end": None,
+                "router": None,
+                "dns_servers": [],
+                "lease_time": 86400
+            }
+            
+            range_match = re.search(r'range\s+([\d.]+)\s+([\d.]+)', block_content)
+            if range_match:
+                subnet_config["range_start"] = range_match.group(1)
+                subnet_config["range_end"] = range_match.group(2)
+            
+            router_match = re.search(r'option\s+routers\s+([\d.]+)', block_content)
+            if router_match:
+                subnet_config["router"] = router_match.group(1)
+            
+            dns_match = re.search(r'option\s+domain-name-servers\s+([^;]+)', block_content)
+            if dns_match:
+                subnet_config["dns_servers"] = [ip.strip() for ip in dns_match.group(1).split(',')]
+            
+            lease_match = re.search(r'default-lease-time\s+(\d+)', block_content)
+            if lease_match:
+                subnet_config["lease_time"] = int(lease_match.group(1))
+            
+            config["subnets"][subnet_ip] = subnet_config
+        
+        host_pattern = r'host\s+(\S+)\s*\{([^}]+)\}'
+        for match in re.finditer(host_pattern, content, re.DOTALL):
+            hostname = match.group(1)
+            block_content = match.group(2)
+            
+            mac_match = re.search(r'hardware\s+ethernet\s+([^;]+)', block_content)
+            ip_match = re.search(r'fixed-address\s+([\d.]+)', block_content)
+            
+            if mac_match and ip_match:
+                config["static_leases"].append({
+                    "hostname": hostname,
+                    "mac": mac_match.group(1).strip(),
+                    "ip": ip_match.group(1)
+                })
+        
+    except Exception as e:
+        logger.error(f"Error parsing DHCP config: {e}")
+    
+    return config
+
+
+def get_dhcp_interfaces() -> List[str]:
+    """Get list of interfaces DHCP server is listening on"""
+    interfaces = []
+    
+    if os.path.exists(DHCP_DEFAULT_FILE):
+        try:
+            with open(DHCP_DEFAULT_FILE, 'r') as f:
+                content = f.read()
+            
+            import re
+            match = re.search(r'INTERFACESv4="([^"]*)"', content)
+            if match:
+                interfaces = match.group(1).split()
+        except Exception as e:
+            logger.error(f"Error reading DHCP interfaces: {e}")
+    
+    return interfaces
+
+
+def generate_dhcp_config(subnets: Dict, static_leases: List[Dict]) -> str:
+    """Generate dhcpd.conf content"""
+    lines = [
+        "# DHCP Server Configuration",
+        "# Generated by RIST Manager",
+        "",
+        "authoritative;",
+        "log-facility local7;",
+        ""
+    ]
+    
+    for subnet_ip, config in subnets.items():
+        lines.append(f"subnet {subnet_ip} netmask {config['netmask']} {{")
+        
+        if config.get("range_start") and config.get("range_end"):
+            lines.append(f"    range {config['range_start']} {config['range_end']};")
+        
+        if config.get("router"):
+            lines.append(f"    option routers {config['router']};")
+        
+        if config.get("dns_servers"):
+            dns_str = ", ".join(config["dns_servers"])
+            lines.append(f"    option domain-name-servers {dns_str};")
+        
+        lease_time = config.get("lease_time", 86400)
+        lines.append(f"    default-lease-time {lease_time};")
+        lines.append(f"    max-lease-time {lease_time * 2};")
+        
+        lines.append("}")
+        lines.append("")
+    
+    if static_leases:
+        lines.append("# Static Leases")
+        for lease in static_leases:
+            hostname = lease.get("hostname", f"host-{lease['ip'].replace('.', '-')}")
+            lines.append(f"host {hostname} {{")
+            lines.append(f"    hardware ethernet {lease['mac']};")
+            lines.append(f"    fixed-address {lease['ip']};")
+            lines.append("}")
+            lines.append("")
+    
+    return "\n".join(lines)
+
+
+def calculate_subnet_from_ip(ip_with_cidr: str) -> tuple:
+    """
+    Calculate subnet address and netmask from IP with CIDR.
+    """
+    import ipaddress
+    
+    try:
+        network = ipaddress.ip_network(ip_with_cidr, strict=False)
+        return str(network.network_address), str(network.netmask)
+    except Exception:
+        return None, None
+
+
+@app.get("/system/dhcp/status")
+def get_dhcp_status(auth: dict = Depends(require_auth)):
+    """Get DHCP server status and configuration"""
+    try:
+        service_installed = os.path.exists("/usr/sbin/dhcpd")
+        
+        service_status = "unknown"
+        try:
+            result = subprocess.run(
+                ["systemctl", "is-active", "isc-dhcp-server"],
+                capture_output=True, text=True
+            )
+            service_status = result.stdout.strip()
+        except:
+            pass
+        
+        config = parse_dhcp_config()
+        interfaces = get_dhcp_interfaces()
+        
+        leases = []
+        leases_file = "/var/lib/dhcp/dhcpd.leases"
+        if os.path.exists(leases_file):
+            try:
+                with open(leases_file, 'r') as f:
+                    content = f.read()
+                
+                import re
+                lease_pattern = r'lease\s+([\d.]+)\s*\{([^}]+)\}'
+                for match in re.finditer(lease_pattern, content, re.DOTALL):
+                    ip = match.group(1)
+                    block = match.group(2)
+                    
+                    lease_info = {"ip": ip}
+                    
+                    mac_match = re.search(r'hardware\s+ethernet\s+([^;]+)', block)
+                    if mac_match:
+                        lease_info["mac"] = mac_match.group(1).strip()
+                    
+                    hostname_match = re.search(r'client-hostname\s+"([^"]+)"', block)
+                    if hostname_match:
+                        lease_info["hostname"] = hostname_match.group(1)
+                    
+                    start_match = re.search(r'starts\s+\d+\s+([^;]+)', block)
+                    if start_match:
+                        lease_info["starts"] = start_match.group(1).strip()
+                    
+                    end_match = re.search(r'ends\s+\d+\s+([^;]+)', block)
+                    if end_match:
+                        lease_info["ends"] = end_match.group(1).strip()
+                    
+                    binding_match = re.search(r'binding\s+state\s+(\w+)', block)
+                    if binding_match:
+                        lease_info["state"] = binding_match.group(1)
+                    
+                    leases.append(lease_info)
+                
+                leases = [l for l in leases if l.get("state") == "active"]
+                
+            except Exception as e:
+                logger.error(f"Error parsing leases: {e}")
+        
+        return {
+            "installed": service_installed,
+            "service_status": service_status,
+            "interfaces": interfaces,
+            "subnets": config.get("subnets", {}),
+            "static_leases": config.get("static_leases", []),
+            "active_leases": leases
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting DHCP status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/system/dhcp/configure")
+def configure_dhcp(request: DHCPSubnetRequest, auth: dict = Depends(require_auth)):
+    """Configure DHCP server for an interface"""
+    try:
+        netplan_data = scan_netplan_files()
+        
+        interface_ip = None
+        if request.interface in netplan_data["interfaces"]:
+            addrs = netplan_data["interfaces"][request.interface]["config"].get("addresses", [])
+            if addrs:
+                interface_ip = addrs[0]
+        
+        if not interface_ip and request.enabled:
+            runtime = get_interface_runtime_info(request.interface)
+            if runtime["ipv4"]:
+                ip = runtime["ipv4"][0]["address"]
+                netmask = runtime["ipv4"][0]["netmask"]
+                import ipaddress
+                cidr = ipaddress.ip_network(f"0.0.0.0/{netmask}").prefixlen
+                interface_ip = f"{ip}/{cidr}"
+        
+        if not interface_ip and request.enabled:
+            raise HTTPException(status_code=400, detail="Interface has no IP address configured. Configure IP first.")
+        
+        current_config = parse_dhcp_config()
+        current_interfaces = get_dhcp_interfaces()
+        
+        if request.enabled:
+            subnet_ip, netmask = calculate_subnet_from_ip(interface_ip)
+            if not subnet_ip:
+                raise HTTPException(status_code=400, detail="Invalid interface IP address")
+            
+            router_ip = interface_ip.split('/')[0]
+            
+            current_config["subnets"][subnet_ip] = {
+                "netmask": netmask,
+                "range_start": request.range_start,
+                "range_end": request.range_end,
+                "router": router_ip,
+                "dns_servers": request.dns_servers,
+                "lease_time": request.lease_time
+            }
+            
+            if request.interface not in current_interfaces:
+                current_interfaces.append(request.interface)
+            
+            current_config["static_leases"] = [
+                l for l in current_config.get("static_leases", [])
+                if not l["ip"].startswith(subnet_ip.rsplit('.', 1)[0])
+            ]
+            current_config["static_leases"].extend(request.static_leases)
+            
+        else:
+            if interface_ip:
+                subnet_ip, _ = calculate_subnet_from_ip(interface_ip)
+                if subnet_ip and subnet_ip in current_config.get("subnets", {}):
+                    del current_config["subnets"][subnet_ip]
+            
+            current_interfaces = [i for i in current_interfaces if i != request.interface]
+        
+        if os.path.exists(DHCP_CONFIG_FILE):
+            shutil.copy2(DHCP_CONFIG_FILE, f"{DHCP_CONFIG_FILE}.bak")
+        
+        new_config = generate_dhcp_config(
+            current_config.get("subnets", {}),
+            current_config.get("static_leases", [])
+        )
+        
+        with open(DHCP_CONFIG_FILE, 'w') as f:
+            f.write(new_config)
+        
+        interfaces_content = f'INTERFACESv4="{" ".join(current_interfaces)}"\n'
+        with open(DHCP_DEFAULT_FILE, 'w') as f:
+            f.write(interfaces_content)
+        
+        if current_interfaces and any(current_config.get("subnets", {}).values()):
+            subprocess.run(["systemctl", "restart", "isc-dhcp-server"], check=True)
+            service_action = "restarted"
+        else:
+            subprocess.run(["systemctl", "stop", "isc-dhcp-server"], capture_output=True)
+            service_action = "stopped"
+        
+        return {
+            "status": "success",
+            "message": f"DHCP configuration updated. Service {service_action}.",
+            "interfaces": current_interfaces,
+            "subnets": list(current_config.get("subnets", {}).keys())
+        }
+        
+    except HTTPException:
+        raise
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error configuring DHCP: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to restart DHCP service: {e.stderr if e.stderr else str(e)}")
+    except Exception as e:
+        logger.error(f"Error configuring DHCP: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/system/dhcp/lease/{ip}")
+def delete_dhcp_lease(ip: str, auth: dict = Depends(require_auth)):
+    """Delete a static DHCP lease"""
+    try:
+        current_config = parse_dhcp_config()
+        
+        current_config["static_leases"] = [
+            l for l in current_config.get("static_leases", [])
+            if l["ip"] != ip
+        ]
+        
+        new_config = generate_dhcp_config(
+            current_config.get("subnets", {}),
+            current_config.get("static_leases", [])
+        )
+        
+        with open(DHCP_CONFIG_FILE, 'w') as f:
+            f.write(new_config)
+        
+        subprocess.run(["systemctl", "restart", "isc-dhcp-server"], capture_output=True)
+        
+        return {"status": "success", "message": f"Static lease for {ip} removed"}
+        
+    except Exception as e:
+        logger.error(f"Error deleting lease: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# Channel Endpoints
+# =============================================================================
 
 @app.get("/channels")
 def get_channels():
@@ -1364,7 +2103,7 @@ def get_next_channel_info():
 
 class BulkOperationRequest(BaseModel):
     channel_ids: List[str]
-    operation: str  # "restart", "start", "stop"
+    operation: str
 
 
 @app.post("/channels/bulk")
@@ -1468,7 +2207,7 @@ def update_channel(channel_id: str, channel: Channel):
     if status == "running":
         try:
             subprocess.run(["systemctl", "restart", f"rist-channel-{channel_id}.service"], check=True)
-            channel_keepalive(channel_id)  # This will start FFmpeg if needed
+            channel_keepalive(channel_id)
         except subprocess.CalledProcessError as e:
             raise HTTPException(status_code=500, 
                           detail=f"Failed to restart services: {e.stderr}")
@@ -1483,10 +2222,9 @@ def start_channel(channel_id: str):
         raise HTTPException(status_code=404)
     
     try:
-        # Enable service so it auto-starts on reboot
         subprocess.run(["systemctl", "enable", f"rist-channel-{channel_id}.service"], check=True)
         subprocess.run(["systemctl", "start", f"rist-channel-{channel_id}.service"], check=True)
-        channel_keepalive(channel_id)  # This will start FFmpeg if needed
+        channel_keepalive(channel_id)
         return {"status": "started"}
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=f"Failed to start services: {e.stderr}")
@@ -1499,9 +2237,7 @@ def stop_channel(channel_id: str):
         raise HTTPException(status_code=404)
     
     try:
-        # FFmpeg will stop automatically due to BindsTo
         subprocess.run(["systemctl", "stop", f"rist-channel-{channel_id}.service"], check=True)
-        # Disable service so it won't auto-start on reboot
         subprocess.run(["systemctl", "disable", f"rist-channel-{channel_id}.service"], check=True)
         return {"status": "stopped"}
     except subprocess.CalledProcessError as e:
@@ -1516,7 +2252,6 @@ def delete_channel(channel_id: str):
         raise HTTPException(status_code=404)
     
     try:
-        # Stop and disable both services
         for service in [f"rist-channel-{channel_id}.service", f"ffmpeg-{channel_id}.service"]:
             try:
                 subprocess.run(["systemctl", "stop", service], check=True)
@@ -1576,7 +2311,6 @@ async def monitor_channel_activity(channel_id: str):
             await asyncio.sleep(30)
     except Exception as e:
         logger.error(f"Error in monitor for channel {channel_id}: {e}")
-        # Cleanup in case of error
         if channel_id in channel_monitors:
             del channel_monitors[channel_id]
         if channel_id in channel_last_active:
@@ -1592,10 +2326,8 @@ async def channel_keepalive(channel_id: str):
     channel_last_active[channel_id] = time.time()
     
     if channel_id not in channel_monitors:
-        # Start FFmpeg if not running
         if not is_ffmpeg_running(channel_id):
             await start_ffmpeg(channel_id)
-        # Start new monitor task
         channel_monitors[channel_id] = asyncio.create_task(
             monitor_channel_activity(channel_id)
         )
@@ -1620,9 +2352,7 @@ def restart_ffmpeg(channel_id: str):
 
 @app.get("/channels/{channel_id}/metrics")
 def get_channel_metrics(channel_id: str):
-    """
-    Retrieve metrics for a specific channel with caching and error handling
-    """
+    """Retrieve metrics for a specific channel with caching and error handling"""
     try:
         config = load_config()
         if channel_id not in config["channels"]:
@@ -1636,7 +2366,6 @@ def get_channel_metrics(channel_id: str):
             logger.error(f"No metrics port configured for channel {channel_id}")
             raise HTTPException(status_code=500, detail="Metrics port not configured")
         
-        # Retrieve cached or fresh metrics
         metrics = get_cached_metrics(channel_id, metrics_port)
         
         return metrics
@@ -1675,9 +2404,7 @@ def get_channel_media_info(channel_id: str):
 
 @app.get("/health/metrics")
 def health_metrics():
-    """
-    Retrieve cached system health metrics
-    """
+    """Retrieve cached system health metrics"""
     return get_system_health_metrics()
 
 @app.get("/health")
@@ -1692,11 +2419,8 @@ def health_check():
 
 @app.get("/channels/{channel_id}/backup-health")
 def get_channel_backup_health(channel_id: str):
-    """
-    Check backup health status for a channel
-    """
+    """Check backup health status for a channel"""
     try:
-        # Look for a health status file created by the failover script
         health_status_file = f"/root/rist/{channel_id}_backup_health.json"
         
         if os.path.exists(health_status_file):
@@ -1710,7 +2434,6 @@ def get_channel_backup_health(channel_id: str):
                 "last_checked": health_data.get('last_checked', None)
             }
         else:
-            # If no health status file exists, assume no backups
             return {
                 "channel_id": channel_id,
                 "has_backups": False,
@@ -1729,11 +2452,8 @@ def get_channel_backup_health(channel_id: str):
 
 @app.get("/channels/{channel_id}/backup-sources")
 def get_channel_backup_sources(channel_id: str):
-    """
-    Retrieve backup sources for a specific channel
-    """
+    """Retrieve backup sources for a specific channel"""
     try:
-        # Load backup sources configuration
         backup_config_path = "/root/rist/backup_sources.yaml"
         
         if not os.path.exists(backup_config_path):
@@ -1742,7 +2462,6 @@ def get_channel_backup_sources(channel_id: str):
         with open(backup_config_path, 'r') as f:
             backup_config = yaml.safe_load(f) or {}
         
-        # Get backup sources for the channel
         backup_sources = backup_config.get('channels', {}).get(channel_id, [])
         
         return {
@@ -1758,36 +2477,28 @@ def update_channel_backup_sources(
     channel_id: str, 
     backup_sources: List[str] = Body(...)
 ):
-    """
-    Update backup sources for a specific channel
-    """
+    """Update backup sources for a specific channel"""
     try:
         backup_config_path = "/root/rist/backup_sources.yaml"
         
-        # Load existing backup sources configuration
         try:
             with open(backup_config_path, 'r') as f:
                 backup_config = yaml.safe_load(f) or {}
         except FileNotFoundError:
             backup_config = {}
         
-        # Ensure channels key exists
         if 'channels' not in backup_config:
             backup_config['channels'] = {}
         
-        # Remove empty strings and duplicates
         clean_sources = list(dict.fromkeys(
             [source.strip() for source in backup_sources if source.strip()]
         ))
         
-        # Update backup sources for the channel
         if clean_sources:
             backup_config['channels'][channel_id] = clean_sources
         elif channel_id in backup_config['channels']:
-            # Remove channel if no backup sources
             del backup_config['channels'][channel_id]
         
-        # Save updated configuration
         with open(backup_config_path, 'w') as f:
             yaml.safe_dump(backup_config, f)
         
@@ -1809,20 +2520,15 @@ BACKUP_SOURCES_PATH = "/root/rist/backup_sources.yaml"
 
 @app.get("/config/backup")
 def download_config_backup():
-    """
-    Download combined configuration backup (receiver_config + backup_sources)
-    """
+    """Download combined configuration backup"""
     try:
-        # Load receiver config
         receiver_config = load_config()
         
-        # Load backup sources
         backup_sources = {}
         if os.path.exists(BACKUP_SOURCES_PATH):
             with open(BACKUP_SOURCES_PATH, 'r') as f:
                 backup_sources = yaml.safe_load(f) or {}
         
-        # Combine into single backup
         combined_backup = {
             "version": "1.0",
             "timestamp": datetime.now().isoformat(),
@@ -1840,9 +2546,7 @@ def download_config_backup():
 
 @app.get("/config/has-backup")
 def check_backup_exists():
-    """
-    Check if .bak files exist for potential revert
-    """
+    """Check if .bak files exist for potential revert"""
     receiver_bak = os.path.exists(f"{CONFIG_FILE}.bak")
     sources_bak = os.path.exists(f"{BACKUP_SOURCES_PATH}.bak")
     
@@ -1863,21 +2567,13 @@ def check_backup_exists():
 
 @app.post("/config/restore")
 async def restore_config(backup_data: dict = Body(...)):
-    """
-    Restore configuration from backup.
-    - Stops all running channels
-    - Saves current config as .bak
-    - Restores from provided backup
-    - Regenerates all service files
-    """
+    """Restore configuration from backup"""
     try:
         logger.info("Starting configuration restore")
         
-        # Validate backup data
         if "receiver_config" not in backup_data:
             raise HTTPException(status_code=400, detail="Invalid backup: missing receiver_config")
         
-        # Step 1: Stop all running channels
         current_config = load_config()
         for channel_id in current_config.get("channels", {}):
             status, _ = get_channel_status(channel_id)
@@ -1888,25 +2584,18 @@ async def restore_config(backup_data: dict = Body(...)):
                 except subprocess.CalledProcessError as e:
                     logger.warning(f"Failed to stop channel {channel_id}: {e}")
         
-        # Step 2: Create .bak files of current config
         logger.info("Creating backup of current configuration")
         
-        # Backup receiver_config.yaml
         if os.path.exists(CONFIG_FILE):
-            import shutil
             shutil.copy2(CONFIG_FILE, f"{CONFIG_FILE}.bak")
         
-        # Backup backup_sources.yaml
         if os.path.exists(BACKUP_SOURCES_PATH):
-            import shutil
             shutil.copy2(BACKUP_SOURCES_PATH, f"{BACKUP_SOURCES_PATH}.bak")
         
-        # Step 3: Delete service files for channels not in new config
         new_channels = backup_data["receiver_config"].get("channels", {})
         for channel_id in current_config.get("channels", {}):
             if channel_id not in new_channels:
                 logger.info(f"Removing channel {channel_id} (not in backup)")
-                # Remove service files
                 for service in [f"rist-channel-{channel_id}.service", f"ffmpeg-{channel_id}.service"]:
                     service_path = f"{SERVICE_DIR}/{service}"
                     try:
@@ -1916,20 +2605,16 @@ async def restore_config(backup_data: dict = Body(...)):
                     except Exception as e:
                         logger.warning(f"Failed to remove service {service}: {e}")
         
-        # Step 4: Save new receiver config
         save_config(backup_data["receiver_config"])
         
-        # Step 5: Save new backup sources
         backup_sources = backup_data.get("backup_sources", {"channels": {}})
         with open(BACKUP_SOURCES_PATH, 'w') as f:
             yaml.safe_dump(backup_sources, f)
         
-        # Step 6: Generate service files for all channels
         for channel_id, channel_data in new_channels.items():
             logger.info(f"Generating service files for {channel_id}")
             generate_service_file(channel_id, channel_data)
         
-        # Reload systemd
         subprocess.run(["systemctl", "daemon-reload"], check=True)
         
         return {
@@ -1948,17 +2633,13 @@ async def restore_config(backup_data: dict = Body(...)):
 
 @app.post("/config/revert")
 async def revert_config():
-    """
-    Revert configuration to .bak files
-    """
+    """Revert configuration to .bak files"""
     try:
         logger.info("Starting configuration revert")
         
-        # Check if .bak files exist
         if not os.path.exists(f"{CONFIG_FILE}.bak"):
             raise HTTPException(status_code=404, detail="No backup found to revert to")
         
-        # Step 1: Stop all running channels
         current_config = load_config()
         for channel_id in current_config.get("channels", {}):
             status, _ = get_channel_status(channel_id)
@@ -1969,11 +2650,9 @@ async def revert_config():
                 except subprocess.CalledProcessError as e:
                     logger.warning(f"Failed to stop channel {channel_id}: {e}")
         
-        # Step 2: Load the backup config to know what channels to expect
         with open(f"{CONFIG_FILE}.bak", 'r') as f:
             bak_config = yaml.safe_load(f)
         
-        # Step 3: Delete service files for channels not in .bak config
         bak_channels = bak_config.get("channels", {})
         for channel_id in current_config.get("channels", {}):
             if channel_id not in bak_channels:
@@ -1987,19 +2666,15 @@ async def revert_config():
                     except Exception as e:
                         logger.warning(f"Failed to remove service {service}: {e}")
         
-        # Step 4: Restore from .bak files
-        import shutil
         shutil.copy2(f"{CONFIG_FILE}.bak", CONFIG_FILE)
         
         if os.path.exists(f"{BACKUP_SOURCES_PATH}.bak"):
             shutil.copy2(f"{BACKUP_SOURCES_PATH}.bak", BACKUP_SOURCES_PATH)
         
-        # Step 5: Regenerate service files for all channels in .bak
         for channel_id, channel_data in bak_channels.items():
             logger.info(f"Regenerating service files for {channel_id}")
             generate_service_file(channel_id, channel_data)
         
-        # Reload systemd
         subprocess.run(["systemctl", "daemon-reload"], check=True)
         
         return {
