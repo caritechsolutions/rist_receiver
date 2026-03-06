@@ -1499,26 +1499,25 @@
 
                 try {
                     this.isPolling = true;
-                    const response = await fetch(`${API_BASE}/channels`, {
+                    const response = await fetch(`${API_BASE}/channels/summary`, {
                         cache: 'no-store',
                         headers: { 'Cache-Control': 'no-cache' }
                     });
-                    const channels = await response.json();
-                    this.channels = channels;
+                    const data = await response.json();
+                    this.channels = data.channels;
 
-                    // Fetch backup health for all channels
-                    await Promise.all(
-                        Object.keys(channels).map(id => this.fetchBackupHealth(id))
-                    );
+                    // Populate backup health from composite response
+                    for (const [id, health] of Object.entries(data.backup_health || {})) {
+                        this.backupHealth[id] = health;
+                    }
 
-                    // Fetch metrics for running channels
-                    const runningChannels = Object.entries(channels)
-                        .filter(([id, ch]) => ch.status === 'running')
-                        .map(([id]) => id);
-                    
-                    await Promise.all(
-                        runningChannels.map(id => this.fetchChannelMetrics(id))
-                    );
+                    // Populate metrics from composite response
+                    for (const [id, m] of Object.entries(data.metrics || {})) {
+                        this.channelMetrics[id] = {
+                            peers: m.peers || 0,
+                            quality: m.quality || 0
+                        };
+                    }
 
                     this.updateStats();
                     this.renderChannels();
