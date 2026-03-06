@@ -23,6 +23,8 @@ import secrets
 import glob
 import shutil
 import threading
+import copy
+from concurrent.futures import ThreadPoolExecutor
 
 
 # Global variable to store previous network stats for bandwidth calculation
@@ -222,6 +224,9 @@ app.add_middleware(AuthMiddleware)
 # Metrics Caching
 metrics_cache = {}
 system_metrics_cache = {}
+
+# Config caching (mtime-based)
+_config_cache = {'data': None, 'mtime': 0}
 
 class RistReceiverSettings(BaseModel):
     profile: int = Field(1, description="RIST profile")
@@ -479,46 +484,56 @@ def get_system_health_metrics(cache_timeout: int = 1):
         logger.error(traceback.format_exc())
         return {}
 
-# Lock to prevent concurrent metrics fetches to the same port
-metrics_fetch_lock = threading.Lock()
+# Per-channel locks to prevent concurrent metrics fetches to the same port
+_metrics_locks = {}
+_metrics_locks_lock = threading.Lock()
+
+def _get_channel_lock(channel_id: str):
+    """Get or create a per-channel lock for metrics fetching"""
+    if channel_id not in _metrics_locks:
+        with _metrics_locks_lock:
+            if channel_id not in _metrics_locks:
+                _metrics_locks[channel_id] = threading.Lock()
+    return _metrics_locks[channel_id]
 
 def get_cached_metrics(channel_id: str, metrics_port: int, cache_timeout: int = 1):
     """
-    Retrieve metrics with a simple caching mechanism and thread-safe fetching
+    Retrieve metrics with a simple caching mechanism and thread-safe fetching.
+    Uses per-channel locks so different channels can fetch concurrently.
     """
     current_time = time.time()
-    
+
     # Check if we have a cached result and it's fresh
-    if (channel_id in metrics_cache and 
+    if (channel_id in metrics_cache and
         current_time - metrics_cache[channel_id]['timestamp'] < cache_timeout):
         return metrics_cache[channel_id]['data']
-    
-    # Use lock to prevent concurrent requests to the same metrics endpoint
-    with metrics_fetch_lock:
+
+    # Use per-channel lock to prevent concurrent requests to the same metrics endpoint
+    with _get_channel_lock(channel_id):
         # Check cache again in case another thread just updated it
-        if (channel_id in metrics_cache and 
+        if (channel_id in metrics_cache and
             current_time - metrics_cache[channel_id]['timestamp'] < cache_timeout):
             return metrics_cache[channel_id]['data']
-        
+
         # Fetch new metrics
         try:
             logger.debug(f"Fetching metrics for channel {channel_id} from port {metrics_port}")
             response = requests.get(f"http://localhost:{metrics_port}/metrics", timeout=2)
-            
+
             if response.status_code != 200:
                 logger.error(f"Metrics endpoint returned status {response.status_code}")
                 return parse_prometheus_metrics("")
-            
+
             metrics = parse_prometheus_metrics(response.text)
-            
+
             # Cache the result
             metrics_cache[channel_id] = {
                 'timestamp': time.time(),
                 'data': metrics
             }
-            
+
             return metrics
-        
+
         except requests.RequestException as e:
             logger.error(f"Error fetching metrics for channel {channel_id}: {e}")
         return parse_prometheus_metrics("")
@@ -690,6 +705,38 @@ def get_channel_status(channel_id: str) -> tuple:
         logger.error(f"Error checking channel status for {channel_id}: {e}")
         return ("error", str(e))
 
+def get_all_channel_statuses(channel_ids: list) -> dict:
+    """Get status of all channels with a single systemctl call instead of N subprocess forks"""
+    try:
+        result = subprocess.run(
+            ["systemctl", "list-units", "--type=service", "--all",
+             "--no-pager", "--no-legend", "--plain"],
+            capture_output=True, text=True, timeout=10
+        )
+        # Parse output: each line is "unit loaded active/inactive/failed sub description..."
+        unit_states = {}
+        for line in result.stdout.strip().split('\n'):
+            parts = line.split()
+            if len(parts) >= 3:
+                unit_states[parts[0]] = parts[2]  # active/inactive/failed
+
+        statuses = {}
+        for channel_id in channel_ids:
+            service_name = f"rist-channel-{channel_id}.service"
+            state = unit_states.get(service_name, "inactive")
+
+            if state == "failed":
+                statuses[channel_id] = ("error", "Service failed")
+            elif state == "active":
+                statuses[channel_id] = ("running", None)
+            else:
+                statuses[channel_id] = ("stopped", None)
+
+        return statuses
+    except Exception as e:
+        logger.error(f"Error batch-checking channel statuses: {e}")
+        return {cid: ("error", str(e)) for cid in channel_ids}
+
 def get_next_metrics_port(config):
     """Find the next available metrics port"""
     max_port = 9200
@@ -699,11 +746,17 @@ def get_next_metrics_port(config):
     return max_port + 1
 
 def load_config():
-    """Load configuration from YAML file"""
+    """Load configuration from YAML file with mtime-based caching"""
     if not os.path.exists(CONFIG_FILE):
         return {"channels": {}}
+    current_mtime = os.path.getmtime(CONFIG_FILE)
+    if _config_cache['data'] is not None and _config_cache['mtime'] == current_mtime:
+        return copy.deepcopy(_config_cache['data'])
     with open(CONFIG_FILE, 'r') as f:
-        return yaml.safe_load(f)
+        data = yaml.safe_load(f)
+    _config_cache['data'] = data
+    _config_cache['mtime'] = current_mtime
+    return copy.deepcopy(data)
 
 
 
@@ -2080,6 +2133,73 @@ def get_channels():
         config["channels"][channel_id]["status"] = status
         config["channels"][channel_id]["last_error"] = last_error
     return config["channels"]
+
+@app.get("/channels/summary")
+def get_channels_summary():
+    """Single endpoint returning all channel data, metrics, and backup health for dashboard"""
+    config = load_config()
+    channel_ids = list(config["channels"].keys())
+
+    # 1. Batch systemctl status check (1 subprocess instead of N)
+    statuses = get_all_channel_statuses(channel_ids)
+
+    # 2. Gather metrics for running channels using thread pool
+    running_ids = [cid for cid, (status, _) in statuses.items() if status == "running"]
+
+    metrics_results = {}
+    if running_ids:
+        def fetch_metrics(cid):
+            port = config["channels"][cid].get("metrics_port")
+            if port:
+                return cid, get_cached_metrics(cid, port, cache_timeout=2)
+            return cid, {}
+
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            for result in pool.map(fetch_metrics, running_ids):
+                cid, m = result
+                metrics_results[cid] = m
+
+    # 3. Gather backup health (file reads — fast)
+    backup_health = {}
+    for cid in channel_ids:
+        health_file = f"/root/rist/{cid}_backup_health.json"
+        try:
+            if os.path.exists(health_file):
+                with open(health_file, 'r') as f:
+                    data = json.load(f)
+                backup_health[cid] = {
+                    "has_backups": data.get("has_backups", False),
+                    "is_healthy": data.get("is_healthy", False)
+                }
+            else:
+                backup_health[cid] = {"has_backups": False, "is_healthy": False}
+        except Exception:
+            backup_health[cid] = {"has_backups": False, "is_healthy": False}
+
+    # 4. Assemble response — refine status with metrics (same logic as get_channel_status)
+    channels = {}
+    for cid in channel_ids:
+        ch = config["channels"][cid]
+        status, last_error = statuses.get(cid, ("stopped", None))
+
+        if status == "running" and cid in metrics_results:
+            m = metrics_results[cid]
+            peers = m.get("peers", 0)
+            quality = m.get("quality", 100)
+            if peers == 0:
+                status, last_error = "error", "No peers connected"
+            elif quality < 50:
+                status, last_error = "error", f"Poor stream quality: {quality:.0f}%"
+
+        ch["status"] = status
+        ch["last_error"] = last_error
+        channels[cid] = ch
+
+    return {
+        "channels": channels,
+        "metrics": metrics_results,
+        "backup_health": backup_health
+    }
 
 @app.get("/channels/next")
 def get_next_channel_info():
