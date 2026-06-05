@@ -63,7 +63,9 @@ build_librist() {
     cd librist
     
     # Configure and build with meson/ninja
-    meson setup build
+    # meson setup build
+    # Configure and build with meson/ninja
+    meson setup build -Dc_args=-Wno-overlength-strings
     cd build
     ninja
     ninja install
