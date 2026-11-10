@@ -1,4 +1,5 @@
 /var/log/wireguard-watchdog.log {
+    su root root
     daily
     missingok
     rotate 7
