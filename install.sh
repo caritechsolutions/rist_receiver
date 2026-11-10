@@ -338,6 +338,12 @@ EOF
     # Not starting WireGuard service automatically since config needs editing
 }
 
+# Install the WireGuard/RIST watchdog (idle until WireGuard is configured)
+setup_watchdog() {
+    echo "Installing WireGuard/RIST watchdog..."
+    bash /root/rist/install-watchdog.sh /root/rist
+}
+
 # Set up DHCP server (disabled by default, configured via web UI)
 setup_dhcp_server() {
     echo "Configuring DHCP server..."
@@ -404,6 +410,7 @@ main() {
     setup_service
     setup_logrotate
     install_wireguard
+    setup_watchdog
     setup_dhcp_server
     start_services
     
@@ -425,6 +432,7 @@ main() {
     echo "New features installed:"
     echo "   - DHCP Server (configure in Settings -> Network)"
     echo "   - WireGuard DNS support (resolvconf)"
+    echo "   - WireGuard/RIST watchdog (log: /var/log/wireguard-watchdog.log)"
     echo ""
 }
 

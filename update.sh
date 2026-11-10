@@ -126,6 +126,18 @@ update_web() {
     echo -e "${GREEN}Web interface updated.${NC}"
 }
 
+# Install/update the WireGuard/RIST watchdog
+update_watchdog() {
+    echo -e "${YELLOW}Updating WireGuard/RIST watchdog...${NC}"
+
+    if [ -f "$TEMP_DIR/rist_receiver/install-watchdog.sh" ]; then
+        bash "$TEMP_DIR/rist_receiver/install-watchdog.sh" "$TEMP_DIR/rist_receiver"
+        echo -e "${GREEN}Watchdog updated.${NC}"
+    else
+        echo -e "${YELLOW}Watchdog files not found in repository, skipping.${NC}"
+    fi
+}
+
 # Update Python dependencies if requirements changed
 update_dependencies() {
     echo -e "${YELLOW}Checking for new dependencies...${NC}"
@@ -187,6 +199,7 @@ show_plan() {
     echo -e "  - /root/rist/rist_api.py"
     echo -e "  - /root/rist/rist-failover.py"
     echo -e "  - /var/www/html/*.html (web interface)"
+    echo -e "  - WireGuard/RIST watchdog (wireguard-watchdog service)"
     echo ""
     echo -e "${GREEN}This script will NOT touch:${NC}"
     echo -e "  - /root/rist/receiver_config.yaml (your channel config)"
@@ -224,6 +237,7 @@ main() {
     download_latest
     update_api
     update_web
+    update_watchdog
     update_dependencies
     restart_services
     cleanup
