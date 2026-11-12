@@ -309,6 +309,13 @@ install_wireguard() {
     echo "Setting up WireGuard configuration..."
     mkdir -p /etc/wireguard
     
+    # Never overwrite a WireGuard config that is already in place
+    if [ -s /etc/wireguard/wg0.conf ] && ! grep -q "YOUR_PRIVATE_KEY" /etc/wireguard/wg0.conf; then
+        echo "Existing WireGuard configuration found at /etc/wireguard/wg0.conf - keeping it."
+        chmod 600 /etc/wireguard/wg0.conf
+        return 0
+    fi
+    
     # Create a template WireGuard configuration
     cat > /etc/wireguard/wg0.conf << 'EOF'
 # WireGuard configuration template
